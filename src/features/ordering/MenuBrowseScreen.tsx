@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useStoreMenu, useStoreStatus } from '../../hooks/useCustomerProfile'
 import { useCart } from '../../contexts/CartContext'
 import { OrderingProvider, useOrdering } from './OrderingContext'
@@ -16,12 +17,50 @@ function MenuBrowseInner() {
   const { data: menuData, isLoading: menuLoading, error: menuError } = useStoreMenu(storeInfo?.storeId || '')
   const { data: storeStatus } = useStoreStatus(storeInfo?.petpoojaRestaurantId || '')
   const { itemCount: _itemCount } = useCart()
+  const [searchParams] = useSearchParams()
+  const applied = useRef(false)
 
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(() => searchParams.get('q') ?? '')
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [selectedOnlineProduct, setSelectedOnlineProduct] = useState<OnlineProduct | null>(null)
   const [cartOpen, setCartOpen] = useState(false)
+
+  useEffect(() => {
+    if (!menuData || applied.current) return
+    applied.current = true
+
+    const categoryParam = searchParams.get('category')
+    if (categoryParam) {
+      const cafeCategories = menuData.categories
+      const onlineProducts = menuData.online_products ?? []
+      const hasPerformanceCoffee = onlineProducts.some(p => p.category_name === 'Performance Coffee')
+      const hasHampers = onlineProducts.some(p => p.category_name === 'Hampers')
+      const validIds = new Set<string>([
+        'all',
+        ...cafeCategories.map(c => c.id),
+        ...(hasPerformanceCoffee ? ['online-performance-coffee'] : []),
+        ...(hasHampers ? ['online-hampers'] : []),
+      ])
+      if (validIds.has(categoryParam)) {
+        setSelectedCategory(categoryParam)
+      }
+    }
+
+    const productParam = searchParams.get('product')
+    if (productParam) {
+      const found = menuData.products.find(p => p.id === productParam)
+      if (found) {
+        setSelectedProduct(found)
+      } else {
+        const onlineProducts = menuData.online_products ?? []
+        const foundOnline = onlineProducts.find(p => p.id === productParam)
+        if (foundOnline) {
+          setSelectedOnlineProduct(foundOnline)
+        }
+      }
+    }
+  }, [menuData])
 
   if (storeLoading || menuLoading) {
     return (
@@ -43,16 +82,16 @@ function MenuBrowseInner() {
   const { store, categories: cafeCategories, products } = menuData
   const onlineProducts = menuData.online_products ?? []
 
-  const hasBeans = onlineProducts.some(p => p.category_name === 'Beans')
+  const hasPerformanceCoffee = onlineProducts.some(p => p.category_name === 'Performance Coffee')
   const hasHampers = onlineProducts.some(p => p.category_name === 'Hampers')
 
   const categories = [
     ...cafeCategories,
-    ...(hasBeans ? [{ id: 'online-beans', name: 'Beans', sort_order: 1000 }] : []),
+    ...(hasPerformanceCoffee ? [{ id: 'online-performance-coffee', name: 'Performance Coffee', sort_order: 1000 }] : []),
     ...(hasHampers ? [{ id: 'online-hampers', name: 'Hampers', sort_order: 1001 }] : []),
   ]
 
-  const filteredCafe = selectedCategory === 'all' || !['online-beans', 'online-hampers'].includes(selectedCategory)
+  const filteredCafe = selectedCategory === 'all' || !['online-performance-coffee', 'online-hampers'].includes(selectedCategory)
     ? products.filter(p => {
         const matchesSearch = !search || p.name.toLowerCase().includes(search.toLowerCase())
         const matchesCategory = selectedCategory === 'all' || p.category_ids.includes(selectedCategory)
@@ -64,8 +103,8 @@ function MenuBrowseInner() {
     if (selectedCategory === 'all') {
       return onlineProducts.filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()))
     }
-    if (selectedCategory === 'online-beans') {
-      return onlineProducts.filter(p => p.category_name === 'Beans' && (!search || p.name.toLowerCase().includes(search.toLowerCase())))
+    if (selectedCategory === 'online-performance-coffee') {
+      return onlineProducts.filter(p => p.category_name === 'Performance Coffee' && (!search || p.name.toLowerCase().includes(search.toLowerCase())))
     }
     if (selectedCategory === 'online-hampers') {
       return onlineProducts.filter(p => p.category_name === 'Hampers' && (!search || p.name.toLowerCase().includes(search.toLowerCase())))

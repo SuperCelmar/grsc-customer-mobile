@@ -140,7 +140,7 @@ export const mockMenu: StoreMenu = {
       description: 'A champion blend crafted for explosive energy and unmatched speed.',
       image_url: 'https://goldrushsportscoffee.com/wp-content/uploads/2025/01/BOLT.png',
       source_id: '981',
-      category_name: 'Beans',
+      category_name: 'Performance Coffee',
       variants: [
         { variant_id: 'mock-var-bolt-coarse', name: 'Coarse', price_paise: 140000, stock_status: 'instock', attributes: { 'grind-size': 'coarse' }, sku: null },
         { variant_id: 'mock-var-bolt-fine', name: 'Fine', price_paise: 140000, stock_status: 'instock', attributes: { 'grind-size': 'fine' }, sku: null },
@@ -155,7 +155,7 @@ export const mockMenu: StoreMenu = {
       description: 'A perfectly balanced roast for those who pursue greatness with grace.',
       image_url: 'https://goldrushsportscoffee.com/wp-content/uploads/2025/01/JORDAN.png',
       source_id: '991',
-      category_name: 'Beans',
+      category_name: 'Performance Coffee',
       variants: [
         { variant_id: 'mock-var-jordan-coarse', name: 'Coarse', price_paise: 140000, stock_status: 'instock', attributes: { 'grind-size': 'coarse' }, sku: null },
         { variant_id: 'mock-var-jordan-fine', name: 'Fine', price_paise: 140000, stock_status: 'instock', attributes: { 'grind-size': 'fine' }, sku: null },
@@ -170,7 +170,7 @@ export const mockMenu: StoreMenu = {
       description: 'A sophisticated single-origin with the precision and focus of a champion.',
       image_url: 'https://goldrushsportscoffee.com/wp-content/uploads/2025/01/TIGER.png',
       source_id: '992',
-      category_name: 'Beans',
+      category_name: 'Performance Coffee',
       variants: [
         { variant_id: 'mock-var-tiger-coarse', name: 'Coarse', price_paise: 140000, stock_status: 'instock', attributes: { 'grind-size': 'coarse' }, sku: null },
         { variant_id: 'mock-var-tiger-fine', name: 'Fine', price_paise: 140000, stock_status: 'instock', attributes: { 'grind-size': 'fine' }, sku: null },
@@ -202,6 +202,7 @@ export const mockOrders: CustomerOrders = {
       status: 'Preparing', order_type: 'Takeaway', total_amount: 450,
       loyalty_discount_amount: 0, cashback_earned: 22.50, item_count: 2,
       order_date: daysAgo(0), updated_at: daysAgo(0), payment_status: 'Paid',
+      reorder_payload: null,
       items: [
         { id: 'oi-1', name: 'Classic Latte', quantity: 1, unit_price: 270, addons: [{ addon_name: 'Large', addon_price: 50 }] },
         { id: 'oi-2', name: 'Iced Americano', quantity: 1, unit_price: 180, addons: [] },
@@ -212,6 +213,7 @@ export const mockOrders: CustomerOrders = {
       status: 'Completed', order_type: 'Dine In', total_amount: 700,
       loyalty_discount_amount: 100, cashback_earned: 35.00, item_count: 3,
       order_date: daysAgo(5), updated_at: daysAgo(5), payment_status: 'Paid',
+      reorder_payload: null,
       items: [
         { id: 'oi-3', name: 'Protein Power Shake', quantity: 1, unit_price: 320, addons: [] },
         { id: 'oi-4', name: 'Cold Brew', quantity: 1, unit_price: 290, addons: [{ addon_name: 'Oat Milk', addon_price: 40 }] },
@@ -223,6 +225,7 @@ export const mockOrders: CustomerOrders = {
       status: 'Completed', order_type: 'Takeaway', total_amount: 520,
       loyalty_discount_amount: 0, cashback_earned: 26.00, item_count: 2,
       order_date: daysAgo(8), updated_at: daysAgo(8), payment_status: 'Paid',
+      reorder_payload: null,
       items: [
         { id: 'oi-6', name: 'Cappuccino', quantity: 2, unit_price: 200, addons: [] },
         { id: 'oi-7', name: 'Chicken Club Sandwich', quantity: 1, unit_price: 280, addons: [] },

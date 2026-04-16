@@ -1,44 +1,66 @@
 import { useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { ShoppingBag, Gift, ClipboardList } from 'lucide-react'
-import { useCustomerProfile } from '../../hooks/useCustomerProfile'
-import { BottomNav } from '../../components/BottomNav'
-import { TierBadge } from './TierBadge'
-import { FreeCoffeeRing } from './FreeCoffeeRing'
+import { useCustomerProfile, useStoreMenu, useStoreStatus } from '../../hooks/useCustomerProfile'
+import { OrderingProvider, useOrdering } from '../ordering/OrderingContext'
 import { TransactionList } from './TransactionList'
-
-function daysUntil(iso: string | null): number | null {
-  if (!iso) return null
-  const diff = new Date(iso).getTime() - Date.now()
-  return Math.ceil(diff / 86400000)
-}
-
-function ExpiryBadge({ endsAt }: { endsAt: string | null }) {
-  const days = daysUntil(endsAt)
-  if (days === null) return null
-  if (days <= 0) return <span className="text-xs font-medium text-error">Allowance expired</span>
-  if (days === 0) return <span className="text-xs font-medium text-error">Expires today — Renew now!</span>
-  return <span className="text-xs text-text-secondary">Expires in {days} day{days !== 1 ? 's' : ''}</span>
-}
+import { HomeHeader } from './HomeHeader'
+import { HomeSearchBar } from './HomeSearchBar'
+import { CategoryIconsRow } from './CategoryIconsRow'
+import { HeroBanner } from './HeroBanner'
+import { PerformanceCoffeeGrid } from './PerformanceCoffeeGrid'
+import { LoyaltyOfferBanner } from './LoyaltyOfferBanner'
+import type { StoreMenu } from '../../lib/api'
 
 function LoadingSkeleton() {
   return (
-    <div className="flex flex-col gap-4 p-4 animate-pulse">
-      <div className="h-6 w-32 bg-card rounded" />
-      <div className="rounded-xl bg-card h-48" />
-      <div className="grid grid-cols-3 gap-3">
-        {[0, 1, 2].map(i => <div key={i} className="h-16 bg-card rounded-xl" />)}
+    <div className="flex flex-col animate-pulse">
+      {/* Header stripe */}
+      <div className="px-4 pt-6 pb-2 bg-white flex items-center justify-between">
+        <div className="flex flex-col gap-1.5">
+          <div className="h-2.5 w-16 bg-card rounded" />
+          <div className="h-4 w-32 bg-card rounded" />
+          <div className="h-2.5 w-20 bg-card rounded" />
+        </div>
+        <div className="w-11 h-11 rounded-full bg-card" />
       </div>
-      <div className="rounded-xl bg-card h-40" />
+      {/* Search stripe */}
+      <div className="px-4 py-3">
+        <div className="h-12 rounded-md bg-card" />
+      </div>
+      {/* Icon row */}
+      <div className="px-4 py-4 flex gap-6">
+        {[0, 1, 2, 3, 4].map(i => (
+          <div key={i} className="flex flex-col items-center gap-1.5">
+            <div className="w-12 h-12 rounded-full bg-card" />
+            <div className="h-2 w-8 bg-card rounded" />
+          </div>
+        ))}
+      </div>
+      {/* Hero block */}
+      <div className="mx-4 h-[160px] rounded-md bg-card" />
+      {/* Grid block */}
+      <div className="px-4 pt-4 grid grid-cols-2 gap-4">
+        {[0, 1, 2, 3].map(i => (
+          <div key={i} className="rounded-md bg-card" style={{ aspectRatio: '3/4' }} />
+        ))}
+      </div>
+      {/* Banner */}
+      <div className="mx-4 mt-4 h-24 rounded-md bg-card" />
+      {/* List */}
+      <div className="mx-4 mt-4 rounded-md bg-card h-32" />
     </div>
   )
 }
 
-export function DashboardScreen() {
+function DashboardInner() {
   const navigate = useNavigate()
   const qc = useQueryClient()
-  const { data, isLoading, isError } = useCustomerProfile()
+
+  const { data: profileData, isLoading: profileLoading, isError: profileError } = useCustomerProfile()
+  const { storeInfo, storeLoading: _storeLoading } = useOrdering()
+  const { data: menuData } = useStoreMenu(storeInfo?.storeId || '')
+  const { data: storeStatus } = useStoreStatus(storeInfo?.petpoojaRestaurantId || '')
 
   // Pull-to-refresh
   const touchStartY = useRef(0)
@@ -48,27 +70,41 @@ export function DashboardScreen() {
     if (delta > 80) qc.invalidateQueries({ queryKey: ['customer-profile'] })
   }
 
-  if (isLoading) return (
-    <div className="min-h-screen bg-white max-w-[430px] mx-auto pb-20">
+  if (profileLoading) return (
+    <div className="min-h-screen bg-muted max-w-[430px] mx-auto pb-20">
       <LoadingSkeleton />
-      <BottomNav />
     </div>
   )
 
-  if (isError || !data) return (
+  if (profileError || !profileData) return (
     <div className="min-h-screen bg-white max-w-[430px] mx-auto pb-20 flex flex-col items-center justify-center gap-4 p-4">
       <p className="text-text-secondary text-center">Could not load profile. Showing last known data.</p>
-      <button onClick={() => qc.invalidateQueries({ queryKey: ['customer-profile'] })}
-        className="text-primary text-sm underline">Retry</button>
-      <BottomNav />
+      <button
+        onClick={() => qc.invalidateQueries({ queryKey: ['customer-profile'] })}
+        className="text-primary text-sm underline"
+      >
+        Retry
+      </button>
     </div>
   )
 
-  const { customer, membership, wallet, recent_transactions } = data
+  const { customer, membership, wallet, recent_transactions } = profileData
 
   const firstName = customer.name?.split(' ')[0] ?? 'there'
   const isActiveMember = membership?.status === 'Active'
   const isExpiredMember = membership?.status === 'Expired'
+
+  const heroVariant: 'active' | 'expired' | 'non-member' = isActiveMember
+    ? 'active'
+    : isExpiredMember
+    ? 'expired'
+    : 'non-member'
+
+  const potentialCashback = Math.round(wallet.potential_cashback_balance)
+
+  const hasPerformanceCoffee = menuData?.online_products?.some(
+    (p: StoreMenu['online_products'][number]) => p.category_name === 'Performance Coffee'
+  )
 
   return (
     <div
@@ -76,122 +112,68 @@ export function DashboardScreen() {
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
-      {/* Header */}
-      <div className="bg-white px-4 pt-12 pb-4 flex items-center justify-between">
-        <div>
-          <p className="text-xs text-text-secondary">Welcome back</p>
-          <h1 className="text-xl font-bold font-display text-text-dark">Hi, {firstName}</h1>
-        </div>
-        {membership && <TierBadge tier={membership.tier} />}
-      </div>
+      <HomeHeader
+        storeName={storeInfo?.storeName}
+        isOpen={storeStatus?.store_status === '1'}
+        firstName={firstName}
+        onProfileClick={() => navigate('/membership')}
+      />
 
-      <div className="px-4 pt-4 flex flex-col gap-4">
+      <HomeSearchBar />
 
-        {/* Main loyalty card */}
-        {isActiveMember && membership ? (
-          <div className="bg-white rounded-xl border border-card p-5">
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <p className="text-xs text-text-secondary uppercase tracking-wider mb-1">Cashback Available</p>
-                <p className="text-3xl font-bold font-display text-text-dark">
-                  ₹{wallet.cashback_balance.toFixed(2)}
-                </p>
-              </div>
-              <TierBadge tier={membership.tier} size="sm" />
+      <CategoryIconsRow />
+
+      <div className="flex flex-col gap-4 pt-2">
+        <HeroBanner
+          variant={heroVariant}
+          tier={membership?.tier}
+          potentialCashback={potentialCashback}
+          onClick={() => navigate('/order?category=online-performance-coffee')}
+        />
+
+        {hasPerformanceCoffee && (
+          <>
+            <div className="px-4 pt-2 pb-1 flex items-center justify-between">
+              <span className="font-display text-[18px] font-semibold text-text-dark">Performance Coffee</span>
+              <button
+                onClick={() => navigate('/order?category=online-performance-coffee')}
+                className="text-[13px] text-primary font-normal"
+              >
+                See all →
+              </button>
             </div>
-
-            {membership.free_coffee_balance >= 0 && (
-              <div className="flex items-center gap-4 pt-4 border-t border-muted">
-                <FreeCoffeeRing
-                  remaining={membership.free_coffee_balance}
-                  total={membership.tier === 'elite' ? 20 : membership.tier === 'legend' ? 20 : 10}
-                  color={membership.tier === 'elite' ? '#C9A961' : membership.tier === 'legend' ? '#D4A574' : '#A0826D'}
-                />
-                <div>
-                  <p className="text-sm font-semibold text-text-dark">
-                    {membership.free_coffee_balance} free coffee{membership.free_coffee_balance !== 1 ? 's' : ''} remaining
-                  </p>
-                  <ExpiryBadge endsAt={membership.allowance_ends_at} />
-                </div>
-              </div>
-            )}
-          </div>
-        ) : isExpiredMember && membership ? (
-          <div className="bg-white rounded-xl border border-card p-5">
-            <div className="flex items-start justify-between mb-3">
-              <div>
-                <p className="text-xs text-text-secondary uppercase tracking-wider mb-1">Cashback Balance</p>
-                <p className="text-3xl font-bold font-display text-text-dark">
-                  ₹{wallet.cashback_balance.toFixed(2)}
-                </p>
-              </div>
-              <span className="inline-flex items-center rounded-full text-xs px-2 py-0.5 font-semibold uppercase tracking-wider bg-error/10 text-error border border-error/30">
-                Expired
-              </span>
-            </div>
-            {membership.allowance_ends_at && (
-              <p className="text-xs text-text-secondary mb-3">
-                Your membership expired on{' '}
-                {new Date(membership.allowance_ends_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
-              </p>
-            )}
-            <button
-              onClick={() => navigate('/membership')}
-              className="w-full bg-primary text-white rounded-md py-2.5 text-sm font-semibold"
-            >
-              Renew your membership
-            </button>
-          </div>
-        ) : (
-          /* Non-member */
-          <div className="bg-white rounded-xl border border-card p-5">
-            <h2 className="text-lg font-bold font-display text-text-dark mb-1">Unlock Your Rewards</h2>
-            {wallet.potential_cashback_balance > 0 && (
-              <p className="text-sm text-text-secondary mb-4">
-                You've earned{' '}
-                <span className="font-semibold text-primary">₹{wallet.potential_cashback_balance.toFixed(2)}</span>{' '}
-                in potential cashback waiting to be unlocked.
-              </p>
-            )}
-            <button
-              onClick={() => navigate('/membership')}
-              className="w-full bg-primary text-white rounded-md py-2.5 text-sm font-semibold"
-            >
-              Become a Pro Member →
-            </button>
-          </div>
+            <PerformanceCoffeeGrid
+              products={menuData?.online_products ?? []}
+              onSelect={p => navigate(`/order?product=${p.id}`)}
+              onQuickAdd={p => navigate(`/order?product=${p.id}`)}
+              // quick-add navigates to picker for v1 — dedicated default-variant add is a follow-up
+            />
+          </>
         )}
 
-        {/* Quick actions */}
-        <div>
-          <p className="text-xs text-text-secondary uppercase tracking-wider mb-2">Quick Actions</p>
-          <div className="grid grid-cols-3 gap-3">
-            {[
-              { label: 'Order', icon: ShoppingBag, path: '/order' },
-              { label: 'Rewards', icon: Gift, path: '/membership' },
-              { label: 'History', icon: ClipboardList, path: '/orders' },
-            ].map(({ label, icon: Icon, path }) => (
-              <button
-                key={label}
-                onClick={() => navigate(path)}
-                className="bg-white rounded-xl border border-card flex flex-col items-center gap-1.5 py-4 text-text-secondary hover:text-primary transition-colors"
-              >
-                <Icon size={22} />
-                <span className="text-xs font-medium">{label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
+        <LoyaltyOfferBanner
+          variant={heroVariant}
+          tier={membership?.tier}
+          freeCoffeeBalance={membership?.free_coffee_balance}
+          cashbackBalance={wallet.cashback_balance}
+          potentialCashback={wallet.potential_cashback_balance}
+          allowanceEndsAt={membership?.allowance_ends_at ?? null}
+          onCTA={() => navigate('/membership')}
+        />
 
-        {/* Recent activity */}
-        <div className="bg-white rounded-xl border border-card p-4">
+        <div className="mx-4 bg-white rounded-md border border-card p-4">
           <p className="text-xs text-text-secondary uppercase tracking-wider mb-2">Recent Activity</p>
           <TransactionList transactions={recent_transactions} />
         </div>
-
       </div>
-
-      <BottomNav />
     </div>
+  )
+}
+
+export function DashboardScreen() {
+  return (
+    <OrderingProvider>
+      <DashboardInner />
+    </OrderingProvider>
   )
 }

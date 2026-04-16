@@ -108,7 +108,7 @@ export type StoreMenu = {
     description: string | null
     image_url: string | null
     source_id: string
-    category_name: 'Beans' | 'Hampers'
+    category_name: 'Performance Coffee' | 'Hampers'
     variants: Array<{
       variant_id: string
       name: string
@@ -116,6 +116,21 @@ export type StoreMenu = {
       stock_status: 'instock' | 'outofstock'
       attributes: Record<string, string>
       sku: string | null
+    }>
+  }>
+}
+
+export type ReorderPayload = {
+  kind: 'cafe'
+  items: Array<{
+    petpooja_item_id: string
+    item_name: string
+    quantity: number
+    addons: Array<{
+      petpooja_addon_id: string
+      mapped_addon_id: number
+      name: string
+      price: number
     }>
   }>
 }
@@ -135,6 +150,7 @@ export type CustomerOrders = {
     order_date: string
     updated_at: string
     payment_status: string
+    reorder_payload: ReorderPayload | null
     items: Array<{
       id: string
       name: string
