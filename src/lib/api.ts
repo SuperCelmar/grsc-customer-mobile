@@ -208,6 +208,12 @@ export type OnlineOrderResponse = {
   currency: 'INR'
 }
 
+export type CashfreeOrderResponse = {
+  success: boolean
+  order_id: string
+  payment_session_id: string
+}
+
 export type VerifyPaymentRequest = {
   razorpay_order_id: string
   razorpay_payment_id: string
@@ -286,6 +292,9 @@ export const api = {
   // Online store (beans)
   createOnlineOrder: (input: OnlineOrderRequest) =>
     callFunction<OnlineOrderResponse>('online-order-create', input),
+
+  createCashfreeOrder: (input: OnlineOrderRequest) =>
+    callFunction<CashfreeOrderResponse>('cashfree-order-create', input),
 
   verifyRazorpayPayment: (input: VerifyPaymentRequest) =>
     callFunction<{ success: boolean; order_id: string; status: string; cashback_awarded?: number }>(

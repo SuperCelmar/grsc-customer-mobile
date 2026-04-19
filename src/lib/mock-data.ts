@@ -267,6 +267,12 @@ export const mockOnlineOrder = {
   currency: 'INR' as const,
 }
 
+export const mockCashfreeOrder = {
+  success: true,
+  order_id: 'mock-cf-ord-new',
+  payment_session_id: 'cf_session_mock12345',
+}
+
 export const mockVerifyPayment = {
   success: true,
   order_id: 'mock-online-ord-new',
@@ -320,6 +326,7 @@ export function getMockResponse(functionName: string): unknown | null {
     case 'external-order': return mockPlaceOrder
     case 'loyalty-redeem': return { success: true, transactionId: 'mock-txn', rewardName: 'Cashback', discountAmount: 50 }
     case 'online-order-create': return mockOnlineOrder
+    case 'cashfree-order-create': return mockCashfreeOrder
     case 'razorpay-verify-payment': return mockVerifyPayment
     case 'subscriptions': return mockSubscriptions
     default: return null

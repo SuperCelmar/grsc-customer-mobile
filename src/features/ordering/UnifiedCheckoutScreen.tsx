@@ -8,9 +8,14 @@ import { useOrdering } from './OrderingContext'
 import { api } from '../../lib/api'
 import type { CustomerAddress, PlaceOrderRequest } from '../../lib/api'
 import { useRazorpay } from './useRazorpay'
+import { useCashfree } from './useCashfree'
 import { AddressBottomSheet } from './AddressBottomSheet'
 
-type RazorpayResult = { shopOrderId: string } | { cancelled: true }
+type PaymentResult = { shopOrderId: string } | { cancelled: true }
+
+const enabledProviders = (import.meta.env.VITE_PAYMENT_PROVIDERS || 'razorpay')
+  .split(',').map((s: string) => s.trim()).filter(Boolean) as string[]
+const defaultProvider = (import.meta.env.VITE_DEFAULT_PAYMENT_PROVIDER || enabledProviders[0] || 'razorpay') as string
 
 export function UnifiedCheckoutScreen() {
   const navigate = useNavigate()
@@ -33,7 +38,9 @@ export function UnifiedCheckoutScreen() {
   const { data: storeStatus } = useStoreStatus(restID)
   const isStoreOpen = storeStatus?.store_status !== '0'
   const { open: openRazorpay } = useRazorpay()
+  const { open: openCashfree } = useCashfree()
 
+  const [selectedProvider, setSelectedProvider] = useState<string>(defaultProvider)
   const [manualAddressId, setManualAddressId] = useState<string | null>(null)
   const [showAddressSheet, setShowAddressSheet] = useState(false)
   const [paymentType, setPaymentType] = useState<'COD' | 'ONLINE' | 'CARD'>('ONLINE')
@@ -67,10 +74,8 @@ export function UnifiedCheckoutScreen() {
     setShowAddressSheet(false)
   }
 
-  // Wrap callback-style Razorpay into a Promise: resolves with shopOrderId on verified success,
-  // resolves with {cancelled:true} on user dismiss, rejects on any error.
-  function payShopWithRazorpay(): Promise<RazorpayResult> {
-    return new Promise<RazorpayResult>((resolve, reject) => {
+  function payShopWithRazorpay(): Promise<PaymentResult> {
+    return new Promise<PaymentResult>((resolve, reject) => {
       if (!selectedAddressId) {
         reject(new Error('Select a delivery address first'))
         return
@@ -128,6 +133,36 @@ export function UnifiedCheckoutScreen() {
     })
   }
 
+  function payShopWithCashfree(): Promise<PaymentResult> {
+    return new Promise<PaymentResult>((resolve, reject) => {
+      if (!selectedAddressId) {
+        reject(new Error('Select a delivery address first'))
+        return
+      }
+
+      api.createCashfreeOrder({
+        items: shopCart.map(i => ({ variant_id: i.variantId, quantity: i.quantity })),
+        shipping_address_id: selectedAddressId,
+      })
+        .then(orderResp => {
+          return openCashfree({
+            payment_session_id: orderResp.payment_session_id,
+            order_id: orderResp.order_id,
+            onSuccess: (orderId) => resolve({ shopOrderId: orderId }),
+            onFailure: (message) => reject(new Error(message)),
+          })
+        })
+        .catch(err => {
+          reject(err instanceof Error ? err : new Error('Failed to initiate payment'))
+        })
+    })
+  }
+
+  function payShop(): Promise<PaymentResult> {
+    if (selectedProvider === 'cashfree') return payShopWithCashfree()
+    return payShopWithRazorpay()
+  }
+
   function buildCafePayload(): PlaceOrderRequest {
     const customer = profile?.customer
     return {
@@ -168,7 +203,7 @@ export function UnifiedCheckoutScreen() {
     setBanner(null)
 
     try {
-      const razorpayResult = await payShopWithRazorpay()
+      const razorpayResult = await payShop()
 
       if ('cancelled' in razorpayResult) {
         setBanner('Payment not completed.')
@@ -319,6 +354,30 @@ export function UnifiedCheckoutScreen() {
               </div>
             )}
           </div>
+
+          {enabledProviders.length > 1 && (
+            <div className="border-t border-[var(--card)] pt-2">
+              <label className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wide block mb-1.5">Payment Provider</label>
+              <div className="flex gap-2">
+                {enabledProviders.map(p => (
+                  <button
+                    key={p}
+                    onClick={() => setSelectedProvider(p)}
+                    disabled={loading}
+                    data-testid={`provider-${p}`}
+                    className="flex-1 py-2 rounded-lg border text-sm font-medium disabled:opacity-40 capitalize"
+                    style={{
+                      borderColor: selectedProvider === p ? 'var(--primary)' : 'var(--card)',
+                      backgroundColor: selectedProvider === p ? 'var(--muted)' : 'white',
+                      color: selectedProvider === p ? 'var(--primary)' : 'var(--text)',
+                    }}
+                  >
+                    {p === 'razorpay' ? 'Razorpay' : 'Cashfree'}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="border-t border-[var(--card)] pt-2 flex justify-between text-sm">
             <span className="text-[var(--text-secondary)]">Shipped subtotal</span>
