@@ -292,6 +292,9 @@ export const api = {
       'razorpay-verify-payment', input
     ),
 
+  manageSubscription: (id: string, action: 'pause' | 'resume' | 'cancel', reason?: string) =>
+    callFunction<{ success: boolean }>('subscription-manage', { id, action, ...(reason ? { reason } : {}) }),
+
   // Addresses (direct table access via RLS)
   listAddresses: async (): Promise<CustomerAddress[]> => {
     const { data, error } = await supabase

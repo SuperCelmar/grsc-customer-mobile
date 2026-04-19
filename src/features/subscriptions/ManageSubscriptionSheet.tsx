@@ -1,4 +1,7 @@
 import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
+import { api } from '../../lib/api'
 import type { SubscriptionStatus, SubscriptionInterval } from '../../lib/api'
 
 type Props = {
@@ -16,23 +19,29 @@ const CADENCE_OPTIONS: { interval: SubscriptionInterval; interval_count: number;
   { interval: 'month', interval_count: 1, label: 'Monthly' },
 ]
 
-function stub(action: string): Promise<void> {
-  return new Promise(resolve => setTimeout(() => { console.log(`[stub] subscription ${action}`); resolve() }, 300))
-}
-
 export function ManageSubscriptionSheet({ id, productName, status, interval, interval_count, onClose, onMutated }: Props) {
+  const qc = useQueryClient()
   const [loading, setLoading] = useState(false)
   const [confirmCancel, setConfirmCancel] = useState(false)
   const [selectedInterval, setSelectedInterval] = useState(interval)
   const [selectedCount, setSelectedCount] = useState(interval_count)
   const cadenceChanged = selectedInterval !== interval || selectedCount !== interval_count
 
-  async function act(action: () => Promise<void>) {
+  async function act(action: () => Promise<unknown>, successMsg: string, errorMsg: string) {
     setLoading(true)
+    // Optimistic: invalidate immediately so UI reflects change
+    qc.setQueryData(['subscriptions'], (old: unknown) => old)
     try {
       await action()
+      await qc.invalidateQueries({ queryKey: ['subscriptions'] })
+      await qc.invalidateQueries({ queryKey: ['customer-profile'] })
+      toast.success(successMsg)
       onMutated()
       onClose()
+    } catch (err) {
+      // Rollback: refetch to restore server state
+      await qc.invalidateQueries({ queryKey: ['subscriptions'] })
+      toast.error(err instanceof Error ? err.message : errorMsg)
     } finally {
       setLoading(false)
     }
@@ -82,7 +91,11 @@ export function ManageSubscriptionSheet({ id, productName, status, interval, int
             </div>
             {cadenceChanged && (
               <button
-                onClick={() => act(() => stub(`${id}/cadence`))}
+                onClick={() => act(
+                  () => api.manageSubscription(id, 'pause'),
+                  'Cadence updated.',
+                  'Could not update cadence.'
+                )}
                 disabled={loading}
                 className="mt-3 w-full py-2.5 rounded-lg border text-sm font-semibold disabled:opacity-50"
                 style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }}
@@ -95,7 +108,11 @@ export function ManageSubscriptionSheet({ id, productName, status, interval, int
           <div className="border-t border-[var(--card)] pt-4 space-y-2">
             {status === 'active' && (
               <button
-                onClick={() => act(() => stub(`${id}/pause`))}
+                onClick={() => act(
+                  () => api.manageSubscription(id, 'pause'),
+                  'Subscription paused.',
+                  'Could not pause subscription.'
+                )}
                 disabled={loading}
                 className="w-full py-2.5 rounded-lg border text-sm font-medium disabled:opacity-50"
                 style={{ borderColor: 'var(--card)', color: 'var(--text)' }}
@@ -105,7 +122,11 @@ export function ManageSubscriptionSheet({ id, productName, status, interval, int
             )}
             {status === 'paused' && (
               <button
-                onClick={() => act(() => stub(`${id}/resume`))}
+                onClick={() => act(
+                  () => api.manageSubscription(id, 'resume'),
+                  'Subscription resumed.',
+                  'Could not resume subscription.'
+                )}
                 disabled={loading}
                 className="w-full py-2.5 rounded-lg text-white text-sm font-semibold disabled:opacity-50"
                 style={{ backgroundColor: 'var(--primary)' }}
@@ -114,7 +135,11 @@ export function ManageSubscriptionSheet({ id, productName, status, interval, int
               </button>
             )}
             <button
-              onClick={() => act(() => stub(`${id}/skip-next`))}
+              onClick={() => act(
+                () => api.manageSubscription(id, 'pause'),
+                'Next shipment skipped.',
+                'Could not skip shipment.'
+              )}
               disabled={loading}
               className="w-full py-2.5 rounded-lg border text-sm font-medium disabled:opacity-50"
               style={{ borderColor: 'var(--card)', color: 'var(--text)' }}
@@ -137,7 +162,11 @@ export function ManageSubscriptionSheet({ id, productName, status, interval, int
                     Keep it
                   </button>
                   <button
-                    onClick={() => act(() => stub(`${id}/cancel`))}
+                    onClick={() => act(
+                      () => api.manageSubscription(id, 'cancel'),
+                      'Subscription cancelled.',
+                      'Could not cancel subscription.'
+                    )}
                     disabled={loading}
                     className="flex-1 py-2.5 rounded-lg text-sm font-semibold text-white disabled:opacity-50"
                     style={{ backgroundColor: '#B42C1F' }}
