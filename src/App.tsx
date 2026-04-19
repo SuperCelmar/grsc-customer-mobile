@@ -11,6 +11,7 @@ import { AddressList } from './features/account/AddressList'
 import { ComingSoonScreen } from './features/account/ComingSoonScreen'
 import { ProtectedLayout } from './components/ProtectedLayout'
 import { AppShell } from './components/AppShell'
+import { TierGuard } from './features/auth/TierGuard'
 
 export default function App() {
   return (
@@ -24,8 +25,8 @@ export default function App() {
             <Route path="/membership" element={<AccountScreen />} />
             <Route path="/account" element={<AccountScreen />} />
             <Route path="/order" element={<MenuBrowseScreen />} />
-            <Route path="/checkout" element={<UnifiedCheckoutScreen />} />
-            <Route path="/checkout/shop" element={<ShopCheckoutScreen />} />
+            <Route path="/checkout" element={<TierGuard require="active-member" fallback="/dashboard"><UnifiedCheckoutScreen /></TierGuard>} />
+            <Route path="/checkout/shop" element={<TierGuard require="active-member" fallback="/dashboard"><ShopCheckoutScreen /></TierGuard>} />
             <Route path="/orders" element={<OrderHistoryScreen />} />
             <Route path="/account/addresses" element={<AddressList />} />
             <Route path="/account/notifications" element={<ComingSoonScreen title="Notifications" />} />
