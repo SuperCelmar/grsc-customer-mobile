@@ -9,7 +9,7 @@ export function FloatingCartButton({ onClick }: Props) {
   return (
     <button
       onClick={onClick}
-      className="fixed bottom-4 left-4 right-4 max-w-[398px] mx-auto flex items-center justify-between px-4 py-3 rounded-lg text-white shadow-lg z-30"
+      className="fixed bottom-[calc(env(safe-area-inset-bottom)+72px)] left-4 right-4 max-w-[398px] mx-auto flex items-center justify-between px-4 py-3 rounded-lg text-white shadow-lg z-40"
       style={{ backgroundColor: 'var(--primary)' }}
     >
       <span className="text-sm font-medium">{itemCount} {itemCount === 1 ? 'item' : 'items'}</span>

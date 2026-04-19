@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ShoppingBag } from 'lucide-react'
 import { useCart } from '../../contexts/CartContext'
 import type { StoreMenu } from '../../lib/api'
 
@@ -7,10 +8,11 @@ type Product = StoreMenu['products'][number]
 type Props = {
   product: Product
   onClose: () => void
+  onViewCart?: () => void
 }
 
-export function ProductDetailSheet({ product, onClose }: Props) {
-  const { addItem } = useCart()
+export function ProductDetailSheet({ product, onClose, onViewCart }: Props) {
+  const { addItem, cartCount } = useCart()
   const [quantity, setQuantity] = useState(1)
   const [selectedAddons, setSelectedAddons] = useState<Record<string, string[]>>({})
   const [specialInstructions, setSpecialInstructions] = useState('')
@@ -56,7 +58,12 @@ export function ProductDetailSheet({ product, onClose }: Props) {
         price: a.price,
       }))
     )
+    const cartItemId =
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `cart_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
     addItem({
+      cartItemId,
       productId: product.id,
       productCode: product.id,
       name: product.name,
@@ -71,18 +78,60 @@ export function ProductDetailSheet({ product, onClose }: Props) {
   const totalPrice = (product.price + getAddonPrice()) * quantity
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col justify-end">
+    <div className="fixed inset-0 z-[60] flex flex-col justify-end">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative bg-white rounded-t-2xl max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white px-4 pt-4 pb-2 flex items-start justify-between border-b border-[var(--card)]">
-          <div>
-            <h2 className="text-lg font-semibold text-[var(--text)]">{product.name}</h2>
-            <p className="text-[var(--primary)] font-medium">₹{product.price}</p>
-          </div>
-          <button onClick={onClose} className="text-[var(--text-secondary)] text-xl leading-none p-1">×</button>
+      <div className="relative bg-white rounded-t-2xl max-h-[92vh] flex flex-col overflow-hidden">
+        {/* Hero: monogram fallback for cafe products (no image_url in cafe menu).
+            When Petpooja image URLs ship, swap this block for an <img>. */}
+        <div
+          className="relative flex-shrink-0 flex items-center justify-center"
+          style={{ height: 240, backgroundColor: 'var(--muted)' }}
+        >
+          <span
+            className="select-none"
+            style={{
+              fontFamily: 'serif',
+              fontSize: 72,
+              fontWeight: 600,
+              color: 'var(--primary)',
+              letterSpacing: '-0.02em',
+            }}
+          >
+            GR
+          </span>
+          {onViewCart && cartCount > 0 && (
+            <button
+              onClick={() => { onClose(); onViewCart() }}
+              aria-label="View cart"
+              className="absolute top-3 left-3 h-9 px-3 rounded-full bg-white shadow-sm flex items-center gap-1.5 text-sm font-medium"
+              style={{ color: 'var(--text)' }}
+            >
+              <ShoppingBag size={14} />
+              Cart · {cartCount}
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="absolute top-3 right-3 w-9 h-9 rounded-full bg-white flex items-center justify-center shadow-sm"
+            style={{ color: 'var(--text)' }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 6L6 18M6 6l12 12" />
+            </svg>
+          </button>
         </div>
 
-        <div className="px-4 pb-6 pt-3 space-y-5">
+        {/* Title + price */}
+        <div className="px-4 pt-4 pb-2 flex-shrink-0">
+          <h2 className="text-lg font-semibold text-[var(--text)]" style={{ fontFamily: 'serif' }}>
+            {product.name}
+          </h2>
+          <p className="text-[var(--primary)] font-medium">₹{product.price}</p>
+        </div>
+
+        {/* Scrollable body */}
+        <div className="flex-1 overflow-y-auto px-4 pb-4 pt-2 space-y-5">
           {product.description && (
             <p className="text-sm text-[var(--text-secondary)]">{product.description}</p>
           )}
@@ -143,29 +192,35 @@ export function ProductDetailSheet({ product, onClose }: Props) {
               className="w-full border border-[var(--card)] rounded-lg px-3 py-2 text-sm text-[var(--text)] resize-none focus:outline-none focus:border-[var(--primary)]"
             />
           </div>
+        </div>
 
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3 border border-[var(--card)] rounded-lg px-2 py-1">
-              <button
-                onClick={() => setQuantity(q => Math.max(1, q - 1))}
-                className="w-7 h-7 flex items-center justify-center text-[var(--text)] font-medium"
-              >−</button>
-              <span className="text-[var(--text)] font-medium w-5 text-center">{quantity}</span>
-              <button
-                onClick={() => setQuantity(q => q + 1)}
-                className="w-7 h-7 flex items-center justify-center text-[var(--text)] font-medium"
-              >+</button>
-            </div>
-
+        {/* Sticky bottom bar: stepper + total + CTA */}
+        <div className="flex-shrink-0 bg-white border-t border-[var(--card)] px-4 py-3 flex items-center gap-3">
+          <div className="flex items-center gap-2 border border-[var(--card)] rounded-lg px-2 py-1 flex-shrink-0">
             <button
-              onClick={handleAddToCart}
-              disabled={!canAddToCart()}
-              className="flex-1 ml-3 py-2 rounded-lg text-white text-sm font-semibold disabled:opacity-40"
-              style={{ backgroundColor: 'var(--primary)' }}
-            >
-              Add to Cart · ₹{totalPrice.toFixed(0)}
-            </button>
+              onClick={() => setQuantity(q => Math.max(1, q - 1))}
+              className="w-7 h-7 flex items-center justify-center text-[var(--text)] font-medium"
+              aria-label="Decrease quantity"
+            >−</button>
+            <span className="text-[var(--text)] font-medium w-5 text-center">{quantity}</span>
+            <button
+              onClick={() => setQuantity(q => Math.min(99, q + 1))}
+              className="w-7 h-7 flex items-center justify-center text-[var(--text)] font-medium"
+              aria-label="Increase quantity"
+            >+</button>
           </div>
+          <div className="flex-shrink-0">
+            <p className="text-[10px] uppercase tracking-wide text-[var(--text-secondary)] leading-none">Total</p>
+            <p className="text-base font-semibold text-[var(--text)] leading-tight">₹{totalPrice.toFixed(0)}</p>
+          </div>
+          <button
+            onClick={handleAddToCart}
+            disabled={!canAddToCart()}
+            className="flex-1 py-2.5 rounded-lg text-white text-sm font-semibold disabled:opacity-40"
+            style={{ backgroundColor: 'var(--primary)' }}
+          >
+            Add to Cart
+          </button>
         </div>
       </div>
     </div>

@@ -16,13 +16,13 @@ function LoadingSkeleton() {
   return (
     <div className="flex flex-col animate-pulse">
       {/* Header stripe */}
-      <div className="px-4 pt-6 pb-2 bg-white flex items-center justify-between">
+      <div className="px-4 pt-8 pb-4 bg-white flex items-center justify-between">
         <div className="flex flex-col gap-1.5">
           <div className="h-2.5 w-16 bg-card rounded" />
-          <div className="h-4 w-32 bg-card rounded" />
-          <div className="h-2.5 w-20 bg-card rounded" />
+          <div className="h-6 w-48 bg-card rounded mt-1" />
+          <div className="h-2.5 w-24 bg-card rounded mt-1" />
         </div>
-        <div className="w-11 h-11 rounded-full bg-card" />
+        <div className="w-10 h-10 rounded-full bg-card" />
       </div>
       {/* Search stripe */}
       <div className="px-4 py-3">

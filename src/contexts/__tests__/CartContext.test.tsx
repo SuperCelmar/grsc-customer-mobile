@@ -6,13 +6,13 @@ import { CartProvider, useCart } from '../CartContext'
 const wrapper = ({ children }: { children: ReactNode }) => <CartProvider>{children}</CartProvider>
 
 const cafeItem = {
-  productId: 'p-1', productCode: 'COF-LAT', name: 'Latte',
+  cartItemId: 'ci-1', productId: 'p-1', productCode: 'COF-LAT', name: 'Latte',
   price: 220, quantity: 1, addons: [], specialInstructions: '',
 }
 
 const shopItem = {
   variantId: 'v-1', productId: 'prod-1', productName: 'Bolt Blend', variantName: 'Whole Bean',
-  pricePaise: 140000, imageUrl: null, quantity: 1,
+  pricePaise: 140000, imageUrl: null, quantity: 1, subscription: null,
 }
 
 describe('CartContext — dual carts', () => {
@@ -95,13 +95,46 @@ describe('CartContext — dual carts', () => {
     expect(result.current.shopCart).toHaveLength(0)
   })
 
-  it('adding same cafe item twice increments quantity', () => {
+  it('adding same cafe item twice creates two separate cart lines', () => {
     const { result } = renderHook(() => useCart(), { wrapper })
     act(() => {
-      result.current.addCafeItem(cafeItem)
-      result.current.addCafeItem(cafeItem)
+      result.current.addCafeItem({ ...cafeItem, cartItemId: 'ci-a' })
+      result.current.addCafeItem({ ...cafeItem, cartItemId: 'ci-b' })
     })
+    expect(result.current.cafeCart).toHaveLength(2)
+    expect(result.current.cafeCart[0].quantity).toBe(1)
+    expect(result.current.cafeCart[1].quantity).toBe(1)
+  })
+
+  it('removeCafeItem removes by cartItemId', () => {
+    const { result } = renderHook(() => useCart(), { wrapper })
+    act(() => {
+      result.current.addCafeItem({ ...cafeItem, cartItemId: 'ci-a' })
+      result.current.addCafeItem({ ...cafeItem, cartItemId: 'ci-b' })
+    })
+    act(() => result.current.removeCafeItem('ci-a'))
     expect(result.current.cafeCart).toHaveLength(1)
-    expect(result.current.cafeCart[0].quantity).toBe(2)
+    expect(result.current.cafeCart[0].cartItemId).toBe('ci-b')
+  })
+
+  it('updateCafeQty updates by cartItemId and removes when qty <= 0', () => {
+    const { result } = renderHook(() => useCart(), { wrapper })
+    act(() => {
+      result.current.addCafeItem({ ...cafeItem, cartItemId: 'ci-a' })
+      result.current.addCafeItem({ ...cafeItem, cartItemId: 'ci-b' })
+    })
+    act(() => result.current.updateCafeQty('ci-a', 5))
+    expect(result.current.cafeCart.find(i => i.cartItemId === 'ci-a')?.quantity).toBe(5)
+    act(() => result.current.updateCafeQty('ci-b', 0))
+    expect(result.current.cafeCart).toHaveLength(1)
+  })
+
+  it('assigns cartItemId to legacy persisted items on load', () => {
+    localStorage.setItem('grsc_cart_cafe', JSON.stringify([
+      { productId: 'p-1', productCode: 'COF-LAT', name: 'Latte', price: 220, quantity: 1, addons: [], specialInstructions: '' },
+    ]))
+    const { result } = renderHook(() => useCart(), { wrapper })
+    expect(result.current.cafeCart).toHaveLength(1)
+    expect(result.current.cafeCart[0].cartItemId).toBeTruthy()
   })
 })

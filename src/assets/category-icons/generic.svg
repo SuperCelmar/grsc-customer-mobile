@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Plate -->
+  <circle cx="12" cy="13" r="7"/>
+  <circle cx="12" cy="13" r="5"/>
+  <!-- Fork (left) -->
+  <line x1="7" y1="3" x2="7" y2="8"/>
+  <line x1="5.5" y1="3" x2="5.5" y2="6"/>
+  <line x1="8.5" y1="3" x2="8.5" y2="6"/>
+  <path d="M5.5 6c0 1 3 1 3 0"/>
+  <!-- Knife (right) -->
+  <path d="M16.5 3v4c.5.5 1 1 1 2v13"/>
+  <path d="M16.5 3c1 0 2 1.5 2 3l-2 2"/>
+</svg>

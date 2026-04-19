@@ -4,7 +4,7 @@
  * Matches exact response shapes from edge functions.
  */
 
-import type { CustomerProfile, StoreMenu, CustomerOrders, PlaceOrderResponse } from './api'
+import type { CustomerProfile, StoreMenu, CustomerOrders, PlaceOrderResponse, CustomerSubscriptions } from './api'
 
 const now = new Date()
 const daysAgo = (d: number) => new Date(now.getTime() - d * 86400000).toISOString()
@@ -141,6 +141,7 @@ export const mockMenu: StoreMenu = {
       image_url: 'https://goldrushsportscoffee.com/wp-content/uploads/2025/01/BOLT.png',
       source_id: '981',
       category_name: 'Performance Coffee',
+      subscription_eligible: true,
       variants: [
         { variant_id: 'mock-var-bolt-coarse', name: 'Coarse', price_paise: 140000, stock_status: 'instock', attributes: { 'grind-size': 'coarse' }, sku: null },
         { variant_id: 'mock-var-bolt-fine', name: 'Fine', price_paise: 140000, stock_status: 'instock', attributes: { 'grind-size': 'fine' }, sku: null },
@@ -156,6 +157,7 @@ export const mockMenu: StoreMenu = {
       image_url: 'https://goldrushsportscoffee.com/wp-content/uploads/2025/01/JORDAN.png',
       source_id: '991',
       category_name: 'Performance Coffee',
+      subscription_eligible: true,
       variants: [
         { variant_id: 'mock-var-jordan-coarse', name: 'Coarse', price_paise: 140000, stock_status: 'instock', attributes: { 'grind-size': 'coarse' }, sku: null },
         { variant_id: 'mock-var-jordan-fine', name: 'Fine', price_paise: 140000, stock_status: 'instock', attributes: { 'grind-size': 'fine' }, sku: null },
@@ -171,6 +173,7 @@ export const mockMenu: StoreMenu = {
       image_url: 'https://goldrushsportscoffee.com/wp-content/uploads/2025/01/TIGER.png',
       source_id: '992',
       category_name: 'Performance Coffee',
+      subscription_eligible: true,
       variants: [
         { variant_id: 'mock-var-tiger-coarse', name: 'Coarse', price_paise: 140000, stock_status: 'instock', attributes: { 'grind-size': 'coarse' }, sku: null },
         { variant_id: 'mock-var-tiger-fine', name: 'Fine', price_paise: 140000, stock_status: 'instock', attributes: { 'grind-size': 'fine' }, sku: null },
@@ -186,6 +189,7 @@ export const mockMenu: StoreMenu = {
       image_url: 'https://goldrushsportscoffee.com/wp-content/uploads/2025/12/hamper.png',
       source_id: '7480',
       category_name: 'Hampers',
+      subscription_eligible: false,
       variants: [
         { variant_id: 'mock-var-hamper-elite', name: 'Elite — French Press & MDF Box', price_paise: 500000, stock_status: 'instock', attributes: { package: 'elite' }, sku: null },
         { variant_id: 'mock-var-hamper-special', name: 'Special — Without French Press & MDF Box', price_paise: 350000, stock_status: 'instock', attributes: { package: 'special' }, sku: null },
@@ -270,6 +274,40 @@ export const mockVerifyPayment = {
   cashback_awarded: 70,
 }
 
+export const mockSubscriptions: CustomerSubscriptions = {
+  success: true,
+  subscriptions: [
+    {
+      id: 'sub-1',
+      product_id: 'mock-bolt',
+      product_name: 'Goldrush Inspired By Bolt',
+      variant_id: 'mock-var-bolt-medium',
+      variant_name: 'Medium',
+      image_url: 'https://goldrushsportscoffee.com/wp-content/uploads/2025/01/BOLT.png',
+      interval: 'month',
+      interval_count: 1,
+      next_shipment_at: daysFromNow(12),
+      last_charged_at: daysAgo(18),
+      status: 'active',
+      price_snapshot: 126000,
+    },
+    {
+      id: 'sub-2',
+      product_id: 'mock-jordan',
+      product_name: 'Goldrush Inspired By Jordan',
+      variant_id: 'mock-var-jordan-whole-bean',
+      variant_name: 'Whole Bean',
+      image_url: 'https://goldrushsportscoffee.com/wp-content/uploads/2025/01/JORDAN.png',
+      interval: 'week',
+      interval_count: 2,
+      next_shipment_at: daysFromNow(5),
+      last_charged_at: daysAgo(9),
+      status: 'paused',
+      price_snapshot: 126000,
+    },
+  ],
+}
+
 // Route mock function name → response
 export function getMockResponse(functionName: string): unknown | null {
   const name = functionName.split('?')[0] // strip query params
@@ -283,6 +321,7 @@ export function getMockResponse(functionName: string): unknown | null {
     case 'loyalty-redeem': return { success: true, transactionId: 'mock-txn', rewardName: 'Cashback', discountAmount: 50 }
     case 'online-order-create': return mockOnlineOrder
     case 'razorpay-verify-payment': return mockVerifyPayment
+    case 'subscriptions': return mockSubscriptions
     default: return null
   }
 }

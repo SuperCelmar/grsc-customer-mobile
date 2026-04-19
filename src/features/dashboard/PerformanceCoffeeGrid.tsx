@@ -41,7 +41,6 @@ export function PerformanceCoffeeGrid({ products, onSelect, onQuickAdd }: Props)
                 <Truck className="w-2.5 h-2.5 text-primary" strokeWidth={2.5} />
                 <span className="text-[10px] font-bold uppercase tracking-widest text-white">Ships 2-3 days</span>
               </div>
-
               <div className="relative mb-2">
                 {product.image_url ? (
                   <img

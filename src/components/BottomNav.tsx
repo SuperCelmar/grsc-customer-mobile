@@ -6,7 +6,7 @@ const tabs: { path: string; icon: LucideIcon; label: string }[] = [
   { path: '/dashboard', icon: House, label: 'Home' },
   { path: '/order', icon: Coffee, label: 'Shop' },
   { path: '/orders', icon: History, label: 'Reorder' },
-  { path: '/membership', icon: CircleUser, label: 'Account' },
+  { path: '/account', icon: CircleUser, label: 'Account' },
 ]
 
 export function BottomNav() {
@@ -14,10 +14,16 @@ export function BottomNav() {
   const { pathname } = useLocation()
   const { canReorder, reorder } = useReorder()
 
+  if (pathname.startsWith('/checkout')) return null
+
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 max-w-[430px] mx-auto bg-white border-t border-card flex px-2 pb-[env(safe-area-inset-bottom)]">
       {tabs.map(({ path, icon: Icon, label }) => {
-        const isActive = path === '/order' ? pathname === path || pathname.startsWith(path + '/') : pathname.startsWith(path)
+        const isActive = path === '/order'
+          ? pathname === path || pathname.startsWith(path + '/')
+          : path === '/account'
+            ? pathname.startsWith('/account') || pathname.startsWith('/membership')
+            : pathname.startsWith(path)
         const handleClick = () => {
           if (path === '/orders') {
             if (canReorder) reorder()

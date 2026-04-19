@@ -15,7 +15,7 @@ export function useReorder() {
 
   const lastReorderable = useMemo(() =>
     data?.orders?.find(o =>
-      ['delivered', 'completed'].includes(o.status) && o.reorder_payload
+      ['delivered', 'completed', 'done'].includes(o.status.toLowerCase()) && o.reorder_payload
     ) ?? null
   , [data])
 
@@ -39,7 +39,12 @@ export function useReorder() {
         }
         return []
       })
+      const cartItemId =
+        typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : `cart_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
       addCafeItem({
+        cartItemId,
         productId: menuProduct.id,
         productCode: item.petpooja_item_id,
         name: menuProduct.name,

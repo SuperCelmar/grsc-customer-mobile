@@ -1,21 +1,35 @@
 import type { CustomerProfile } from '../../lib/api'
 
-const TIER_COLORS: Record<string, string> = {
-  pro: '#A0826D',
-  elite: '#C9A961',
-  legend: '#D4A574',
-}
+type TierKey = 'pro' | 'elite' | 'legend'
 
-const TIER_CASHBACK: Record<string, number> = {
-  pro: 5,
-  elite: 10,
-  legend: 15,
-}
-
-const TIER_LABELS: Record<string, string> = {
-  pro: 'Pro',
-  elite: 'Elite',
-  legend: 'Legend',
+const TIER_CONFIG: Record<TierKey, {
+  color: string
+  label: string
+  cashback: number
+  freeCoffees: number | null
+  haloShadow: string
+}> = {
+  pro: {
+    color: '#A0826D',
+    label: 'Pro Member',
+    cashback: 5,
+    freeCoffees: 10,
+    haloShadow: 'shadow-[0_6px_20px_-12px_rgba(160,130,109,0.35)]',
+  },
+  elite: {
+    color: '#C9A961',
+    label: 'Elite Member',
+    cashback: 10,
+    freeCoffees: 20,
+    haloShadow: 'shadow-[0_10px_30px_-15px_rgba(201,169,97,0.45)]',
+  },
+  legend: {
+    color: '#D4A574',
+    label: 'Legend Member',
+    cashback: 15,
+    freeCoffees: null,
+    haloShadow: 'shadow-[0_12px_36px_-16px_rgba(212,165,116,0.55)]',
+  },
 }
 
 function daysLeft(dateStr: string | null): number | null {
@@ -36,13 +50,13 @@ function formatDate(dateStr: string | null): string {
 type MembershipDetailViewProps = {
   membership: NonNullable<CustomerProfile['membership']>
   onUpgrade?: () => void
+  embedded?: boolean
 }
 
-export function MembershipDetailView({ membership, onUpgrade }: MembershipDetailViewProps) {
-  const tier = membership.tier
-  const color = TIER_COLORS[tier] ?? '#D4A574'
-  const cashbackRate = TIER_CASHBACK[tier] ?? 0
-  const label = TIER_LABELS[tier] ?? tier
+export function MembershipDetailView({ membership, onUpgrade, embedded = false }: MembershipDetailViewProps) {
+  const tier = (membership.tier as TierKey) ?? 'pro'
+  const config = TIER_CONFIG[tier] ?? TIER_CONFIG.pro
+  const { color, label, cashback: cashbackRate, freeCoffees: maxCoffees, haloShadow } = config
   const isExpired = membership.status === 'Expired'
   const allowanceDaysLeft = daysLeft(membership.allowance_ends_at)
   const expiresWithin7Days =
@@ -50,13 +64,28 @@ export function MembershipDetailView({ membership, onUpgrade }: MembershipDetail
     membership.allowance_ends_at !== null &&
     (allowanceDaysLeft ?? Infinity) <= 7
 
-  return (
-    <div className="flex flex-col min-h-screen bg-[#FFFFFF]">
-      <div className="px-4 pt-10 pb-4">
-        <h1 className="font-serif text-2xl font-bold text-[#1A1410]">Membership</h1>
-      </div>
+  const isLegend = tier === 'legend'
+  const balance = membership.free_coffee_balance
+  const ratio = maxCoffees && maxCoffees > 0 ? Math.max(0, Math.min(1, balance / maxCoffees)) : 0
 
-      {/* Status banner */}
+  const ringSize = 80
+  const ringRadius = 38
+  const ringStroke = 2
+  const circumference = 2 * Math.PI * ringRadius
+  const dashOffset = circumference * (1 - ratio)
+
+  const rootClass = embedded
+    ? 'flex flex-col'
+    : 'flex flex-col min-h-screen bg-[#FFFFFF]'
+
+  return (
+    <div className={rootClass}>
+      {!embedded && (
+        <div className="px-4 pt-10 pb-4">
+          <h1 className="font-serif text-2xl font-bold text-[#1A1410]">Membership</h1>
+        </div>
+      )}
+
       {isExpired && (
         <div className="mx-4 mb-3 rounded-lg bg-red-50 border border-red-200 px-4 py-3">
           <p className="text-sm font-semibold text-red-700">Your membership has expired</p>
@@ -76,70 +105,126 @@ export function MembershipDetailView({ membership, onUpgrade }: MembershipDetail
         </div>
       )}
 
-      {/* Membership card */}
+      {/* Vault Card */}
       <div
-        className="mx-4 rounded-xl border-2 p-5"
-        style={{ borderColor: color }}
+        className={`mx-4 relative overflow-hidden rounded-2xl border border-[#E8DDD0] bg-[#F5EFE9] px-6 pt-6 pb-5 text-[#1A1410] ${haloShadow}`}
       >
-        {/* Tier badge */}
-        <div className="flex items-center gap-2 mb-4">
-          <span
-            className="text-xs font-bold uppercase tracking-widest px-2 py-1 rounded-full"
-            style={{ backgroundColor: color + '22', color }}
-          >
-            {label} Member
-          </span>
-          {isExpired && (
-            <span className="text-xs font-semibold text-red-600 bg-red-50 px-2 py-1 rounded-full">
-              Expired
+        <div className="pointer-events-none absolute inset-0 opacity-[0.035] bg-[radial-gradient(#1A1410_1px,transparent_1px)] [background-size:4px_4px]" />
+        <div className="pointer-events-none absolute inset-0 opacity-40 bg-gradient-to-tr from-transparent via-white/60 to-transparent" />
+
+        {/* Header */}
+        <div className="relative flex items-start justify-between">
+          <div className="flex flex-col">
+            <span
+              className="text-[10px] font-bold uppercase tracking-[0.3em]"
+              style={{ color }}
+            >
+              {label}
             </span>
+            <div className="mt-1 h-px w-8" style={{ backgroundColor: color }} />
+          </div>
+          <span className="text-[9px] uppercase tracking-[0.25em] text-[#6B6560]">
+            GoldRush Society
+          </span>
+        </div>
+
+        {/* Centerpiece */}
+        <div className="relative mt-6 mb-8 flex items-center gap-5">
+          {!isLegend ? (
+            <div className="relative flex shrink-0 items-center justify-center" style={{ width: ringSize, height: ringSize }}>
+              <svg width={ringSize} height={ringSize} className="-rotate-90">
+                <circle
+                  cx={ringSize / 2}
+                  cy={ringSize / 2}
+                  r={ringRadius}
+                  stroke="#E8DDD0"
+                  strokeWidth={ringStroke}
+                  fill="none"
+                />
+                <circle
+                  cx={ringSize / 2}
+                  cy={ringSize / 2}
+                  r={ringRadius}
+                  stroke={color}
+                  strokeWidth={ringStroke}
+                  strokeLinecap="round"
+                  fill="none"
+                  strokeDasharray={circumference}
+                  strokeDashoffset={dashOffset}
+                />
+              </svg>
+              <span
+                className="absolute font-serif text-2xl italic"
+                style={{ color }}
+              >
+                {balance}
+              </span>
+            </div>
+          ) : (
+            <div
+              className="flex shrink-0 items-center justify-center"
+              style={{ width: ringSize, height: ringSize }}
+            >
+              <span className="font-serif text-5xl font-light leading-none" style={{ color }}>
+                ∞
+              </span>
+            </div>
           )}
-        </div>
 
-        {/* Dates */}
-        <div className="flex gap-6 mb-4 text-sm">
-          <div>
-            <p className="text-[#6B6560] text-xs">Allowance started</p>
-            <p className="font-semibold text-[#1A1410]">
-              {formatDate(membership.allowance_starts_at)}
-            </p>
-          </div>
-          <div>
-            <p className="text-[#6B6560] text-xs">Allowance ends</p>
-            <p className="font-semibold text-[#1A1410]">
-              {formatDate(membership.allowance_ends_at)}
-            </p>
+          <div className="flex flex-col">
+            <span
+              className={`${isLegend ? 'font-serif italic' : ''} text-3xl font-light leading-none tracking-tight`}
+            >
+              {isLegend ? 'Unlimited' : `${balance} ${balance === 1 ? 'Coffee' : 'Coffees'}`}
+            </span>
+            <span className="mt-2 text-[10px] uppercase tracking-[0.25em] text-[#6B6560]">
+              {isLegend ? 'Daily Allowance' : 'Remaining Allowance'}
+            </span>
           </div>
         </div>
 
-        {/* Benefits */}
-        <div>
-          <p className="text-xs font-semibold text-[#6B6560] uppercase tracking-wide mb-2">
-            Benefits
-          </p>
-          <ul className="space-y-2 text-sm text-[#1A1410]">
-            <li className="flex justify-between">
-              <span className="text-[#6B6560]">Cashback rate</span>
-              <span className="font-semibold">{cashbackRate}%</span>
-            </li>
-            {tier !== 'legend' && (
-              <li className="flex justify-between">
-                <span className="text-[#6B6560]">Free coffees remaining</span>
-                <span className="font-semibold">{membership.free_coffee_balance}</span>
-              </li>
+        {/* Footer metadata strip */}
+        <div className="relative flex items-end justify-between border-t border-[#E8DDD0]/70 pt-4">
+          <div className="flex gap-7">
+            <div className="flex flex-col">
+              <span className="mb-1 text-[9px] uppercase tracking-[0.25em] text-[#6B6560]">
+                Valid Thru
+              </span>
+              <span className="text-xs font-medium tabular-nums">
+                {formatDate(membership.allowance_ends_at)}
+              </span>
+            </div>
+            <div className="flex flex-col">
+              <span className="mb-1 text-[9px] uppercase tracking-[0.25em] text-[#6B6560]">
+                Cashback
+              </span>
+              <span className="text-xs font-medium tabular-nums">{cashbackRate}%</span>
+            </div>
+            {!isLegend && !isExpired && membership.allowance_ends_at && (
+              <div className="flex flex-col">
+                <span className="mb-1 text-[9px] uppercase tracking-[0.25em] text-[#6B6560]">
+                  Days Left
+                </span>
+                <span className="text-xs font-medium tabular-nums">{allowanceDaysLeft ?? '—'}</span>
+              </div>
             )}
-            {membership.allowance_ends_at && !isExpired && (
-              <li className="flex justify-between">
-                <span className="text-[#6B6560]">Days left</span>
-                <span className="font-semibold">{allowanceDaysLeft ?? '—'}</span>
-              </li>
-            )}
-          </ul>
+          </div>
+          <svg
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke={color}
+            strokeWidth="1.25"
+            className="opacity-30"
+          >
+            <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
+          </svg>
         </div>
       </div>
 
       {/* Upgrade / Legend promo */}
-      {tier === 'pro' && onUpgrade && (
+      {!embedded && tier === 'pro' && onUpgrade && (
         <div className="mx-4 mt-4 rounded-lg bg-[#F5EFE9] p-4 flex items-center justify-between">
           <div>
             <p className="text-sm font-semibold text-[#1A1410]">Upgrade to Elite</p>
@@ -153,7 +238,7 @@ export function MembershipDetailView({ membership, onUpgrade }: MembershipDetail
           </button>
         </div>
       )}
-      {tier === 'elite' && (
+      {!embedded && tier === 'elite' && (
         <div className="mx-4 mt-4 rounded-lg bg-[#F5EFE9] p-4">
           <p className="text-sm font-semibold text-[#1A1410]">Earn Legend status</p>
           <p className="text-xs text-[#6B6560] mt-1">
@@ -161,7 +246,7 @@ export function MembershipDetailView({ membership, onUpgrade }: MembershipDetail
           </p>
         </div>
       )}
-      {tier === 'legend' && (
+      {!embedded && tier === 'legend' && (
         <div className="mx-4 mt-4 rounded-lg bg-[#F5EFE9] p-4">
           <p className="text-sm font-semibold text-[#1A1410]">You're on the best plan!</p>
           <p className="text-xs text-[#6B6560] mt-1">

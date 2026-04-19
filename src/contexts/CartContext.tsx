@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 type AddonSelection = { id: string; name: string; price: number }
 
 export type CafeCartItem = {
+  cartItemId: string
   productId: string
   productCode: string
   name: string
@@ -11,6 +12,18 @@ export type CafeCartItem = {
   quantity: number
   addons: AddonSelection[]
   specialInstructions: string
+}
+
+function generateCartItemId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  return `cart_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
+}
+
+export type CartSubscription = {
+  interval: 'week' | 'month'
+  interval_count: number
 }
 
 export type ShopCartItem = {
@@ -21,14 +34,15 @@ export type ShopCartItem = {
   pricePaise: number
   imageUrl: string | null
   quantity: number
+  subscription: CartSubscription | null
 }
 
 type CartContextType = {
   // Cafe cart (PetPooja flow)
   cafeCart: CafeCartItem[]
   addCafeItem: (item: CafeCartItem) => void
-  removeCafeItem: (productId: string) => void
-  updateCafeQty: (productId: string, qty: number) => void
+  removeCafeItem: (cartItemId: string) => void
+  updateCafeQty: (cartItemId: string, qty: number) => void
   clearCafeCart: () => void
   cafeCount: number
   cafeSubtotal: number
@@ -48,8 +62,8 @@ type CartContextType = {
   // Back-compat aliases (existing CartDrawer / FloatingCartButton / MenuBrowseScreen)
   items: CafeCartItem[]
   addItem: (item: CafeCartItem) => void
-  removeItem: (productId: string) => void
-  updateQty: (productId: string, qty: number) => void
+  removeItem: (cartItemId: string) => void
+  updateQty: (cartItemId: string, qty: number) => void
   clearCart: () => void
   itemCount: number
   subtotal: number
@@ -67,6 +81,12 @@ function loadFromStorage<T>(key: string): T[] {
   }
 }
 
+function ensureCartItemIds(items: CafeCartItem[]): CafeCartItem[] {
+  return items.map(item =>
+    item.cartItemId ? item : { ...item, cartItemId: generateCartItemId() }
+  )
+}
+
 const CartContext = createContext<CartContextType>({} as CartContextType)
 
 export function CartProvider({ children }: { children: ReactNode }) {
@@ -75,9 +95,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
     const legacy = loadFromStorage<CafeCartItem>('grsc_cart')
     if (legacy.length > 0) {
       try { localStorage.removeItem('grsc_cart') } catch {}
-      return legacy
+      return ensureCartItemIds(legacy)
     }
-    return loadFromStorage<CafeCartItem>(CAFE_KEY)
+    return ensureCartItemIds(loadFromStorage<CafeCartItem>(CAFE_KEY))
   })
   const [shopCart, setShopCart] = useState<ShopCartItem[]>(() => loadFromStorage<ShopCartItem>(SHOP_KEY))
 
@@ -97,18 +117,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   // Cafe actions
   const addCafeItem = (item: CafeCartItem) => setCafeCart(prev => {
-    const existing = prev.find(i => i.productId === item.productId)
-    if (existing) {
-      return prev.map(i => i.productId === item.productId ? { ...i, quantity: i.quantity + item.quantity } : i)
-    }
-    return [...prev, item]
+    const withId = item.cartItemId ? item : { ...item, cartItemId: generateCartItemId() }
+    return [...prev, withId]
   })
-  const removeCafeItem = (productId: string) =>
-    setCafeCart(prev => prev.filter(i => i.productId !== productId))
-  const updateCafeQty = (productId: string, qty: number) =>
+  const removeCafeItem = (cartItemId: string) =>
+    setCafeCart(prev => prev.filter(i => i.cartItemId !== cartItemId))
+  const updateCafeQty = (cartItemId: string, qty: number) =>
     setCafeCart(prev => qty <= 0
-      ? prev.filter(i => i.productId !== productId)
-      : prev.map(i => i.productId === productId ? { ...i, quantity: qty } : i))
+      ? prev.filter(i => i.cartItemId !== cartItemId)
+      : prev.map(i => i.cartItemId === cartItemId ? { ...i, quantity: qty } : i))
   const clearCafeCart = () => {
     setCafeCart([])
     try { localStorage.removeItem(CAFE_KEY) } catch {}

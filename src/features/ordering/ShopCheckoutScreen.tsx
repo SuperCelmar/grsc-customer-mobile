@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { ArrowLeft } from 'lucide-react'
+import { ScreenHeader } from '../../components/ScreenHeader'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCart } from '../../contexts/CartContext'
 import { useCustomerProfile } from '../../hooks/useCustomerProfile'
@@ -10,7 +12,13 @@ import { AddressBottomSheet } from './AddressBottomSheet'
 
 export function ShopCheckoutScreen() {
   const navigate = useNavigate()
+  const location = useLocation()
   const qc = useQueryClient()
+
+  function handleBack() {
+    if ((location.key ?? 'default') !== 'default') navigate(-1)
+    else navigate('/order')
+  }
   const { shopCart, shopSubtotalPaise, clearShopCart } = useCart()
   const { data: profile } = useCustomerProfile()
   const { open: openRazorpay } = useRazorpay()
@@ -96,14 +104,10 @@ export function ShopCheckoutScreen() {
   if (shopCart.length === 0) {
     return (
       <div className="min-h-screen bg-white max-w-[430px] mx-auto flex flex-col">
-        <div className="bg-white px-4 pt-12 pb-4 flex items-center gap-3 border-b border-[var(--card)]">
-          <button onClick={() => navigate(-1)} className="text-[var(--text)] p-1">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M19 12H5M12 5l-7 7 7 7" />
-            </svg>
-          </button>
-          <h1 className="text-lg font-semibold text-[var(--text)]">Checkout</h1>
-        </div>
+        <ScreenHeader
+          title="Checkout"
+          onBack={handleBack}
+        />
         <div className="flex-1 flex flex-col items-center justify-center gap-4 p-6 text-center">
           <p className="text-[var(--text-secondary)]">Your shop cart is empty.</p>
           <button
@@ -122,14 +126,10 @@ export function ShopCheckoutScreen() {
 
   return (
     <div className="min-h-screen bg-[var(--muted)] max-w-[430px] mx-auto flex flex-col">
-      <div className="bg-white px-4 pt-12 pb-4 flex items-center gap-3 border-b border-[var(--card)]">
-        <button onClick={() => navigate(-1)} className="text-[var(--text)] p-1">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M19 12H5M12 5l-7 7 7 7" />
-          </svg>
-        </button>
-        <h1 className="text-lg font-semibold text-[var(--text)]">Checkout</h1>
-      </div>
+      <ScreenHeader
+        title="Checkout"
+        onBack={handleBack}
+      />
 
       <div className="flex-1 overflow-y-auto pb-28 px-4 py-4 space-y-4">
         <div className="bg-white rounded-lg border border-[var(--card)] p-3 space-y-3">
@@ -139,6 +139,11 @@ export function ShopCheckoutScreen() {
               <div className="flex-1">
                 <p className="text-sm font-medium text-[var(--text)]">{item.productName}</p>
                 <p className="text-xs text-[var(--text-secondary)]">{item.variantName} × {item.quantity}</p>
+                {item.subscription && (
+                  <p className="text-xs mt-0.5 font-medium" style={{ color: 'var(--primary)' }}>
+                    ↻ Subscription — starts today · renews {item.subscription.interval_count === 1 ? `every ${item.subscription.interval}` : `every ${item.subscription.interval_count} ${item.subscription.interval}s`}
+                  </p>
+                )}
               </div>
               <p className="text-sm font-medium text-[var(--text)] ml-3">
                 ₹{((item.pricePaise * item.quantity) / 100).toFixed(0)}
@@ -233,9 +238,12 @@ export function ShopCheckoutScreen() {
                 <span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
                 Processing...
               </span>
-            : `Pay ₹${subtotalRupees.toFixed(0)}`
+            : `Proceed to Pay · ₹${subtotalRupees.toFixed(0)}+`
           }
         </button>
+        <p className="text-xs text-center text-[var(--text-secondary)] mt-2">
+          Total excludes shipping. Final amount calculated at payment.
+        </p>
       </div>
 
       {showAddressSheet && (

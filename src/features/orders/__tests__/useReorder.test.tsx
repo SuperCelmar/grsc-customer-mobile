@@ -134,7 +134,8 @@ describe('useReorder', () => {
     act(() => result.current.reorder())
     expect(mockClearCafeCart).toHaveBeenCalledOnce()
     expect(mockAddCafeItem).toHaveBeenCalledOnce()
-    expect(mockAddCafeItem).toHaveBeenCalledWith({
+    expect(mockAddCafeItem).toHaveBeenCalledWith(expect.objectContaining({
+      cartItemId: expect.any(String),
       productId: 'petpooja-001',
       productCode: 'petpooja-001',
       name: 'Espresso',
@@ -142,7 +143,7 @@ describe('useReorder', () => {
       quantity: 2,
       addons: [{ id: 'addon-001', name: 'Oat Milk', price: 30 }],
       specialInstructions: '',
-    })
+    }))
     expect(toast.success).toHaveBeenCalledWith('Added 1 items to cart.')
     expect(mockNavigate).toHaveBeenCalledWith('/order')
   })

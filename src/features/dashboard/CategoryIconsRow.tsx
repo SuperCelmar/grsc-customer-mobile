@@ -1,53 +1,45 @@
 import { useNavigate } from 'react-router-dom'
-import { LayoutGrid, Coffee, Bean, Gift, Ticket } from 'lucide-react'
-import type { LucideIcon } from 'lucide-react'
+import {
+  CafeIcon,
+  ColdBrewsIcon,
+  ProteinShakeIcon,
+  HampersIcon,
+  RewardsIcon,
+  type CategoryIcon,
+} from '../../assets/category-icons'
 
 interface CategoryItem {
   id: string
   label: string
-  Icon: LucideIcon
-  filled: boolean
+  Icon: CategoryIcon
   to: string
 }
 
 const ITEMS: CategoryItem[] = [
-  { id: 'all',     label: 'All',     Icon: LayoutGrid, filled: false, to: '/order' },
-  { id: 'cafe',    label: 'Cafe',    Icon: Coffee,     filled: true,  to: '/order?category=cafe' },
-  { id: 'beans',   label: 'Performance Coffee', Icon: Bean, filled: true, to: '/order?category=online-performance-coffee' },
-  { id: 'hampers', label: 'Hampers', Icon: Gift,       filled: false, to: '/order?category=online-hampers' },
-  { id: 'rewards', label: 'Rewards', Icon: Ticket,     filled: false, to: '/membership' },
+  { id: 'coffee',         label: 'Coffee',         Icon: CafeIcon,         to: '/order?category=cafe' },
+  { id: 'cold-brews',     label: 'Cold Brews',     Icon: ColdBrewsIcon,    to: '/order?category=cold-brews' },
+  { id: 'protein-shakes', label: 'Protein Shakes', Icon: ProteinShakeIcon, to: '/order?category=protein-shakes' },
+  { id: 'hampers',        label: 'Hampers',        Icon: HampersIcon,      to: '/order?category=online-hampers' },
+  { id: 'rewards',        label: 'Rewards',        Icon: RewardsIcon,      to: '/membership' },
 ]
 
 export function CategoryIconsRow() {
   const navigate = useNavigate()
 
   return (
-    <div
-      className="px-4 py-4 flex gap-6 overflow-x-auto snap-x snap-mandatory scrollbar-hide"
-      style={{ WebkitOverflowScrolling: 'touch' }}
-    >
-      {ITEMS.map(({ id, label, Icon, filled, to }) => (
+    <div className="px-3 pt-3 pb-2 flex gap-1">
+      {ITEMS.map(({ id, label, Icon, to }) => (
         <button
           key={id}
           aria-label={`Browse ${label}`}
           onClick={() => navigate(to)}
-          className="flex flex-col items-center gap-1.5 min-w-[56px] snap-start active:scale-95 transition-transform duration-100"
+          className="flex-1 flex flex-col items-center gap-1.5 active:scale-95 transition-transform duration-100"
         >
+          <Icon width={28} height={28} style={{ color: '#1A1410' }} aria-hidden="true" />
           <span
-            className="flex items-center justify-center w-12 h-12 rounded-full"
-            style={
-              filled
-                ? { backgroundColor: '#D4A574' }
-                : { backgroundColor: '#FFFFFF', border: '1px solid #D4A574' }
-            }
+            className="text-[11px] leading-tight text-center"
+            style={{ color: '#1A1410' }}
           >
-            <Icon
-              size={24}
-              style={filled ? { color: '#FFFFFF' } : { color: '#D4A574' }}
-              aria-hidden="true"
-            />
-          </span>
-          <span className="text-[11px] text-text-secondary leading-tight text-center">
             {label}
           </span>
         </button>

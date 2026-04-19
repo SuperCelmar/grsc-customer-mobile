@@ -109,6 +109,7 @@ export type StoreMenu = {
     image_url: string | null
     source_id: string
     category_name: 'Performance Coffee' | 'Hampers'
+    subscription_eligible: boolean
     variants: Array<{
       variant_id: string
       name: string
@@ -226,6 +227,27 @@ export type CustomerAddress = {
   created_at: string
 }
 
+export type SubscriptionInterval = 'week' | 'month'
+export type SubscriptionStatus = 'active' | 'paused' | 'past_due' | 'cancelled' | 'cancelled_payment_failed'
+
+export type CustomerSubscriptions = {
+  success: boolean
+  subscriptions: Array<{
+    id: string
+    product_id: string
+    product_name: string
+    variant_id: string | null
+    variant_name: string | null
+    image_url: string | null
+    interval: SubscriptionInterval
+    interval_count: number
+    next_shipment_at: string
+    last_charged_at: string | null
+    status: SubscriptionStatus
+    price_snapshot: number
+  }>
+}
+
 export const api = {
   getCustomerProfile: () =>
     callFunction<CustomerProfile>('customer-profile', {}),
@@ -257,6 +279,9 @@ export const api = {
 
   getCustomerOrders: (page = 1, limit = 10, activeOnly = false) =>
     callFunction<CustomerOrders>('customer-orders', { page, limit, activeOnly }),
+
+  getSubscriptions: () =>
+    callFunction<CustomerSubscriptions>('subscriptions', undefined, { method: 'GET' }),
 
   // Online store (beans)
   createOnlineOrder: (input: OnlineOrderRequest) =>
