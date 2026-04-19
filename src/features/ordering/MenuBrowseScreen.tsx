@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { ShoppingBag } from 'lucide-react'
 import { ScreenHeader } from '../../components/ScreenHeader'
 import { useSearchParams } from 'react-router-dom'
 import { useStoreMenu, useStoreStatus } from '../../hooks/useCustomerProfile'

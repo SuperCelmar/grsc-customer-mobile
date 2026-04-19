@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
 import { ScreenHeader } from '../../components/ScreenHeader'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCart } from '../../contexts/CartContext'

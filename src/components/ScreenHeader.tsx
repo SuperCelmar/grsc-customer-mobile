@@ -1,4 +1,4 @@
-import { ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { User, ShoppingBag, ChevronLeft } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
