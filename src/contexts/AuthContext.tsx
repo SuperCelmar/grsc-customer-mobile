@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
+import { setSentryUser } from '../lib/sentry'
 
 type AuthContextType = {
   session: Session | null
@@ -18,10 +19,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
+      setSentryUser(session)
       setLoading(false)
     })
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
+      setSentryUser(session)
     })
     return () => subscription.unsubscribe()
   }, [])
@@ -38,6 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user: { id: 'dev-user', phone: `+91${phone}`, aud: 'authenticated', role: 'authenticated', created_at: new Date().toISOString(), app_metadata: {}, user_metadata: {} },
     } as unknown as Session
     setSession(mock)
+    setSentryUser(mock)
     setLoading(false)
     try { sessionStorage.setItem('grsc_dev_session', '1') } catch {}
   }
