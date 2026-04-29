@@ -1,5 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
+import { api } from '../../lib/api'
+import { fetchOrderWithRetry } from './lib/fetchOrderWithRetry'
 
 type FulfillmentStatus = 'PLACED' | 'CONFIRMED' | 'PACKED' | 'DISPATCHED' | 'DELIVERED' | 'CANCELLED'
 
@@ -12,10 +16,17 @@ interface FulfillmentEvent {
 interface OrderState {
   fulfillment_status: FulfillmentStatus
   source_order_id: string | null
+  payment_status: string | null
   events: FulfillmentEvent[]
 }
 
-type Props = { orderId: string }
+type Props = {
+  orderId: string
+  // TODO (Phase 3.3): wire this to resume a persisted Cashfree payment session
+  onResumePayment?: (orderId: string) => void
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 const STEPS: { key: FulfillmentStatus; label: string; icon: string }[] = [
   { key: 'PLACED',     label: 'Placed',     icon: '📋' },
@@ -30,65 +41,61 @@ const STEP_INDEX: Record<FulfillmentStatus, number> = {
 }
 
 const TERMINAL: Set<FulfillmentStatus> = new Set(['DELIVERED', 'CANCELLED'])
+const CANCELLABLE: Set<FulfillmentStatus> = new Set(['PLACED', 'CONFIRMED'])
 
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
-export function ActiveOrderTracker({ orderId }: Props) {
-  const [order, setOrder] = useState<OrderState>({
-    fulfillment_status: 'PLACED',
-    source_order_id: null,
-    events: [],
-  })
+export function ActiveOrderTracker({ orderId, onResumePayment }: Props) {
+  const navigate = useNavigate()
+  const isValidId = UUID_RE.test(orderId) || orderId.startsWith('mock-')
+  const isMockOrder = orderId.startsWith('mock-')
+  const [order, setOrder] = useState<OrderState | null>(null)
+  const [fetchDone, setFetchDone] = useState(!isValidId)
   const [reconnecting, setReconnecting] = useState(false)
+  const [cancelState, setCancelState] = useState<'idle' | 'confirming' | 'cancelling'>('idle')
 
-  async function fetchOrder() {
-    const { data } = await supabase
-      .from('orders')
-      .select(`
-        fulfillment_status,
-        source_order_id,
-        order_fulfillment_events (id, to_state, created_at)
-      `)
-      .eq('order_id', orderId)
-      .order('created_at', { referencedTable: 'order_fulfillment_events', ascending: true })
-      .maybeSingle()
-
+  const fetchOrder = useCallback(async () => {
+    if (isMockOrder) {
+      setOrder({ fulfillment_status: 'PLACED', source_order_id: null, payment_status: null, events: [] })
+      setFetchDone(true)
+      return
+    }
+    const data = await fetchOrderWithRetry(orderId)
     if (data) {
       setOrder({
         fulfillment_status: (data.fulfillment_status ?? 'PLACED') as FulfillmentStatus,
         source_order_id: data.source_order_id,
+        payment_status: data.payment_status ?? null,
         events: (data.order_fulfillment_events ?? []) as FulfillmentEvent[],
       })
+    } else {
+      setOrder(null)
     }
-  }
-
-  useEffect(() => { fetchOrder() }, [orderId])
+    setFetchDone(true)
+  }, [orderId, isMockOrder])
 
   useEffect(() => {
-    if (TERMINAL.has(order.fulfillment_status)) return
+    if (!isValidId) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchOrder()
+  }, [isValidId, fetchOrder])
+
+  useEffect(() => {
+    if (!isValidId || isMockOrder) return
+    if (order && TERMINAL.has(order.fulfillment_status)) return
 
     const channel = supabase
       .channel('order-fulfillment-' + orderId)
       .on(
         'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'orders',
-          filter: `order_id=eq.${orderId}`,
-        },
+        { event: 'UPDATE', schema: 'public', table: 'orders', filter: `order_id=eq.${orderId}` },
         () => { fetchOrder() }
       )
       .on(
         'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'order_fulfillment_events',
-          filter: `order_id=eq.${orderId}`,
-        },
+        { event: 'INSERT', schema: 'public', table: 'order_fulfillment_events', filter: `order_id=eq.${orderId}` },
         () => { fetchOrder() }
       )
       .subscribe((state: string) => {
@@ -100,10 +107,59 @@ export function ActiveOrderTracker({ orderId }: Props) {
       })
 
     return () => { channel.unsubscribe() }
-  }, [orderId, order.fulfillment_status])
+  }, [orderId, isMockOrder, isValidId, order, fetchOrder])
+
+  async function handleCancel() {
+    setCancelState('cancelling')
+    try {
+      await api.cancelOrder(orderId, 'Customer cancelled from app')
+      toast.success('Order cancelled')
+      fetchOrder()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to cancel order')
+      // Refetch — if the order was already cancelled server-side, render the correct state
+      await fetchOrder()
+      setCancelState('idle')
+    }
+  }
+
+  // Invalid UUID or order not found after fetch — show degraded null state
+  if (!isValidId || (fetchDone && order === null)) {
+    return (
+      <div
+        className="rounded-xl border p-4 text-center space-y-2"
+        style={{ borderColor: 'var(--card)', backgroundColor: 'var(--muted)' }}
+      >
+        <p className="text-sm text-[var(--text-secondary)]">
+          Couldn't load this order — refresh or check Orders.
+        </p>
+        <button
+          onClick={() => navigate('/orders')}
+          className="text-sm font-medium"
+          style={{ color: 'var(--primary)' }}
+        >
+          Go to Orders
+        </button>
+      </div>
+    )
+  }
+
+  // Still loading
+  if (!fetchDone || order === null) {
+    return (
+      <div
+        className="rounded-xl border p-4 flex items-center justify-center"
+        style={{ borderColor: 'var(--card)', backgroundColor: 'var(--muted)' }}
+      >
+        <div className="animate-spin rounded-full h-5 w-5 border-2 border-[var(--primary)] border-t-transparent" />
+      </div>
+    )
+  }
 
   const status = order.fulfillment_status
   const isCancelled = status === 'CANCELLED'
+  const isAwaitingPayment = order.payment_status != null &&
+    order.payment_status.toLowerCase() === 'pending'
   const currentIndex = STEP_INDEX[status] ?? 0
 
   const eventsByState: Record<string, string> = {}
@@ -134,7 +190,21 @@ export function ActiveOrderTracker({ orderId }: Props) {
             Order Cancelled
           </div>
         </div>
-      ) : (
+      ) : isAwaitingPayment ? (
+        <div className="py-3 space-y-2">
+          <p className="text-sm text-[var(--text-secondary)]">Awaiting payment</p>
+          {/* TODO (Phase 3.3): onResumePayment wires to persisted Cashfree session in localStorage */}
+          <button
+            onClick={() => onResumePayment?.(orderId)}
+            disabled={!onResumePayment}
+            className="text-sm font-medium disabled:opacity-40"
+            style={{ color: 'var(--primary)' }}
+          >
+            Resume payment
+          </button>
+        </div>
+      ) : (<>
+
         <div className="py-3">
           <div className="flex items-start">
             {STEPS.map((step, i) => {
@@ -179,7 +249,40 @@ export function ActiveOrderTracker({ orderId }: Props) {
             })}
           </div>
         </div>
-      )}
+        {CANCELLABLE.has(status) && (
+          <div className="pt-2 border-t border-[var(--card)]">
+            {cancelState === 'confirming' ? (
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs text-[var(--text-secondary)]">Cancel this order?</span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setCancelState('idle')}
+                    className="text-xs font-medium px-3 py-1.5 rounded-md border border-[var(--card)] text-[var(--text-secondary)]"
+                  >
+                    Keep
+                  </button>
+                  <button
+                    onClick={handleCancel}
+                    className="text-xs font-medium px-3 py-1.5 rounded-md text-white"
+                    style={{ backgroundColor: '#B42C1F' }}
+                  >
+                    Yes, cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => setCancelState('confirming')}
+                disabled={cancelState === 'cancelling'}
+                className="text-xs font-medium disabled:opacity-50"
+                style={{ color: '#B42C1F' }}
+              >
+                {cancelState === 'cancelling' ? 'Cancelling…' : 'Cancel order'}
+              </button>
+            )}
+          </div>
+        )}
+      </>)}
     </div>
   )
 }

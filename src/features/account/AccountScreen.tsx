@@ -40,12 +40,14 @@ export function AccountScreen() {
   }
 
   const profile = data as AccountProfile
+  const rawFirstName = data.customer?.name?.split(' ')[0]
+  const firstName = rawFirstName?.trim() ? rawFirstName.trim() : null
 
   return (
     <div className="flex flex-col min-h-screen bg-white pb-24">
       <ScreenHeader title="Account" />
 
-      <TierHero profile={profile} />
+      <TierHero profile={profile} firstName={firstName} />
       <CashbackStrip profile={profile} />
 
       <GroupLabel>Commerce</GroupLabel>

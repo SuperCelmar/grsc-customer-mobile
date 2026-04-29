@@ -1,10 +1,14 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 import { useCart } from '../../contexts/CartContext'
 import type { CartSubscription } from '../../contexts/CartContext'
 import { useCustomerProfile } from '../../hooks/useCustomerProfile'
 import { api } from '../../lib/api'
-import type { PlaceOrderRequest } from '../../lib/api'
+import type { LoyaltyReward, PlaceOrderRequest } from '../../lib/api'
+import { RewardPicker } from '../orders/RewardPicker'
+import { useCashfree } from './useCashfree'
+import { cartHash, clearSessionByOrderId, loadSession, saveSession } from './useCashfreeSession'
 
 function cadenceLabel(sub: CartSubscription): string {
   if (sub.interval === 'month' && sub.interval_count === 1) return 'Monthly'
@@ -75,24 +79,23 @@ export function CartDrawer({ onClose, storeRestId, isStoreOpen }: Props) {
     shopCart, removeShopItem, updateShopQty, shopCount, shopSubtotalPaise,
   } = useCart()
   const { data: profile } = useCustomerProfile()
+  const { open: openCashfree } = useCashfree()
 
   // Pickup-only for v1 — selector UI hidden, state kept for payload shape
   const [orderType] = useState<'P' | 'H' | 'D'>('P')
   const [paymentType, setPaymentType] = useState<'COD' | 'ONLINE' | 'CARD'>('COD')
-  const [promoCode, setPromoCode] = useState('')
-  const [promoError, setPromoError] = useState<string | null>(null)
+  const [selectedReward, setSelectedReward] = useState<LoyaltyReward | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const taxEstimate = Math.round(cafeSubtotal * 0.18)
   const cafeTotal = cafeSubtotal + taxEstimate
+  const rewardDiscount = selectedReward
+    ? Math.min(selectedReward.cashback?.maxRedeemableNow ?? 0, cafeTotal)
+    : 0
+  const payableCafeTotal = Math.max(0, cafeTotal - rewardDiscount)
   const shopSubtotal = shopSubtotalPaise / 100
-  const grandTotal = cafeTotal + shopSubtotal
-
-  function handleApplyPromo() {
-    // TODO: wire to loyalty-redeem edge function
-    setPromoError('Promo system coming soon.')
-  }
+  const grandTotal = payableCafeTotal + shopSubtotal
 
   async function handlePlaceOrder() {
     if (itemCount === 0) return
@@ -110,9 +113,9 @@ export function CartDrawer({ onClose, storeRestId, isStoreOpen }: Props) {
           restID: storeRestId,
           order_type: orderType,
           payment_type: paymentType,
-          total: cafeTotal,
+          total: payableCafeTotal,
           tax_total: taxEstimate,
-          discount_total: 0,
+          discount_total: rewardDiscount,
         },
         items: items.map(item => ({
           id: item.productCode,
@@ -120,14 +123,104 @@ export function CartDrawer({ onClose, storeRestId, isStoreOpen }: Props) {
           quantity: item.quantity,
           price: item.price,
           tax_percentage: 18,
-          addons: item.addons.map(a => ({ id: a.id, name: a.name, price: a.price })),
+          addons: item.addons.map(a => ({ id: a.id, name: a.name, price: a.price, group_name: a.groupName ?? '' })),
         })),
       }
 
+      // For cafe-only orders with online payment, route through Cashfree.
+      // External-order (api.placeOrder) is only valid for COD; otherwise the charge never happens.
+      if (isCafeOnly && paymentType !== 'COD') {
+        try {
+          const phone = customer?.phone || ''
+          const hash = cartHash(items)
+
+          // Idempotency: reuse an existing non-expired session for the same cart
+          const existing = phone ? loadSession(phone) : null
+          const sessionToUse = existing?.cart_hash === hash ? existing : null
+
+          let order_id: string
+          let payment_session_id: string
+
+          if (sessionToUse) {
+            order_id = sessionToUse.order_id
+            payment_session_id = sessionToUse.payment_session_id
+          } else {
+            const created = await api.createCashfreeCafeOrder(payload)
+            order_id = created.order_id
+            payment_session_id = created.payment_session_id
+            if (phone) saveSession(phone, { order_id, payment_session_id, cart_hash: hash })
+          }
+
+          await openCashfree({
+            payment_session_id,
+            order_id,
+            onSuccess: async (paidOrderId) => {
+              const UUID_RE = /^[0-9a-f-]{36}$/
+              if (!paidOrderId || !UUID_RE.test(paidOrderId)) {
+                console.error('cashfree-cafe: invalid paidOrderId', { paidOrderId })
+                toast.error('Payment succeeded but order ID is invalid — check Orders tab.')
+                clearCart()
+                onClose()
+                return
+              }
+              if (phone) clearSessionByOrderId(paidOrderId)
+              if (selectedReward && customer?.id) {
+                try {
+                  await api.redeemReward({
+                    customerId: customer.id,
+                    rewardId: selectedReward.id,
+                    orderId: paidOrderId,
+                    amountToRedeem: rewardDiscount,
+                  })
+                } catch (redeemErr) {
+                  const msg = redeemErr instanceof Error ? redeemErr.message : 'Reward could not be applied'
+                  toast.error(`Order placed but reward failed: ${msg}`)
+                }
+              }
+              clearCart()
+              onClose()
+              navigate(`/orders?active=${paidOrderId}`)
+            },
+            onFailure: (msg) => {
+              console.error('cashfree-cafe: payment failure', { phase: 'openCashfree', order_id, payment_session_id, msg })
+              toast.error(msg || 'Payment could not be completed')
+              setError(msg || 'Payment could not be completed')
+            },
+          })
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : 'Payment could not be started'
+          console.error('cashfree-cafe: session creation failed', { phase: 'cashfree-cafe', err })
+          toast.error(msg)
+          setError(msg)
+        }
+        return
+      }
+
       const result = await api.placeOrder(payload)
+
+      if (selectedReward && customer?.id) {
+        try {
+          await api.redeemReward({
+            customerId: customer.id,
+            rewardId: selectedReward.id,
+            orderId: result.order_id,
+            amountToRedeem: rewardDiscount,
+          })
+        } catch (redeemErr) {
+          const msg = redeemErr instanceof Error ? redeemErr.message : 'Reward could not be applied'
+          toast.error(`Order placed but reward failed: ${msg}`)
+        }
+      }
+
       clearCart()
       onClose()
-      navigate(`/orders?active=${result.order_id}`)
+      const UUID_RE = /^[0-9a-f-]{36}$/
+      if (result.order_id && UUID_RE.test(result.order_id)) {
+        navigate(`/orders?active=${result.order_id}`)
+      } else {
+        console.error('place-order: invalid order_id', { order_id: result.order_id })
+        navigate('/orders')
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to place order. Please try again.'
       setError(message)
@@ -300,6 +393,12 @@ export function CartDrawer({ onClose, storeRestId, isStoreOpen }: Props) {
                 <div className="flex justify-between text-[var(--text-secondary)]">
                   <span>Tax & Service (18%)</span><span>₹{taxEstimate}</span>
                 </div>
+                {rewardDiscount > 0 && (
+                  <div className="flex justify-between" style={{ color: '#6B8E23' }}>
+                    <span>{selectedReward?.name ?? 'Reward'}</span>
+                    <span>−₹{rewardDiscount.toFixed(0)}</span>
+                  </div>
+                )}
               </>
             )}
             {shopCount > 0 && (
@@ -318,35 +417,14 @@ export function CartDrawer({ onClose, storeRestId, isStoreOpen }: Props) {
 
           {cafeCount > 0 && (
             <>
-              {/* Promo code — UI only (stubbed). TODO: wire to loyalty-redeem edge function */}
-              <div className="pt-2">
-                <label className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wide block mb-1.5">
-                  Have a Promo Code?
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    value={promoCode}
-                    onChange={e => { setPromoCode(e.target.value); setPromoError(null) }}
-                    placeholder="Enter code"
-                    className="flex-1 border border-[var(--card)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--primary)]"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleApplyPromo}
-                    className="px-4 py-2 rounded-lg border text-sm font-medium"
-                    style={{
-                      borderColor: 'var(--card)',
-                      color: 'var(--text)',
-                      backgroundColor: 'white',
-                    }}
-                  >
-                    Apply
-                  </button>
-                </div>
-                {promoError && (
-                  <p className="text-xs text-[var(--text-secondary)] mt-1.5">{promoError}</p>
-                )}
-              </div>
+              {profile?.customer.id && (
+                <RewardPicker
+                  customerId={profile.customer.id}
+                  orderAmount={cafeTotal}
+                  selectedRewardId={selectedReward?.id ?? null}
+                  onSelect={setSelectedReward}
+                />
+              )}
 
               {isCafeOnly && (
                 <div className="pt-2 space-y-3">

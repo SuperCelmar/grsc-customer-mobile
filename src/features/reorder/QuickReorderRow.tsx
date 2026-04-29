@@ -162,7 +162,7 @@ export function QuickReorderRow() {
                     name: topItem.name,
                     price: topItem.price,
                     quantity: 1,
-                    addons: usualAddons.map(a => ({ id: a.addon_name, name: a.addon_name, price: a.addon_price })),
+                    addons: usualAddons.map(a => ({ id: a.addon_name, name: a.addon_name, price: a.addon_price, groupName: '' })),
                     specialInstructions: '',
                   }
                   addCafeItem(cartItem)

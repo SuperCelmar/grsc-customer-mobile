@@ -55,14 +55,9 @@ export function useCashfree(): {
     setError(null)
 
     try {
-      const isDev = import.meta.env.DEV && sessionStorage.getItem('grsc_dev_session') === '1'
-
-      if (isDev) {
-        await new Promise(r => setTimeout(r, 500))
-        opts.onSuccess(opts.order_id)
-        return
-      }
-
+      // No dev short-circuit: we always open the real Cashfree SDK so the
+      // full payment flow (modal, card/UPI entry, webhook) is exercised even
+      // when the rest of the app is in grsc_dev_session mock mode.
       await loadCashfreeScript()
 
       const mode = (import.meta.env.VITE_CASHFREE_ENV || 'sandbox') as 'sandbox' | 'production'

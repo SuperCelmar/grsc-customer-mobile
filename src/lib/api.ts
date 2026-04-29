@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import { getMockResponse } from './mock-data'
+import { getMockResponse, getActiveTestPhone } from './mock-data'
 
 const FUNCTIONS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`
 
@@ -8,8 +8,20 @@ function isDevMock(): boolean {
 }
 
 async function callFunction<T>(name: string, body?: unknown, options?: { method?: string; noAuth?: boolean }): Promise<T> {
-  // DEV mock: return fake data instead of hitting the real backend
-  if (isDevMock()) {
+  const session = (await supabase.auth.getSession()).data.session
+
+  // A real session always wins over the dev mock flag. If the user logged in
+  // for real but a stale grsc_dev_session=1 is hanging around in sessionStorage,
+  // clear it so subsequent calls are consistent.
+  if (session?.access_token) {
+    try { sessionStorage.removeItem('grsc_dev_session') } catch {}
+  }
+
+  // DEV mock: return fake data instead of hitting the real backend.
+  // Skipped entirely once a real session exists.
+  // Exception: cashfree-order-create always hits the real edge function so the
+  // Cashfree SDK receives a real payment_session_id and the modal can open.
+  if (!session?.access_token && isDevMock() && name !== 'cashfree-order-create') {
     const mock = getMockResponse(name)
     if (mock) {
       await new Promise(r => setTimeout(r, 200)) // simulate network latency
@@ -17,7 +29,6 @@ async function callFunction<T>(name: string, body?: unknown, options?: { method?
     }
   }
 
-  const session = (await supabase.auth.getSession()).data.session
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
@@ -25,6 +36,12 @@ async function callFunction<T>(name: string, body?: unknown, options?: { method?
   }
   if (session?.access_token && !options?.noAuth) {
     headers['Authorization'] = `Bearer ${session.access_token}`
+  }
+  // Dev mock mode with no real session: cashfree-order-create would 401, so
+  // send the active test-persona phone in x-dev-phone. The edge function
+  // accepts it iff DEV_ALLOW_PHONE_OVERRIDE=1 is set on the (non-prod) project.
+  if (!session?.access_token && isDevMock() && name === 'cashfree-order-create') {
+    headers['x-dev-phone'] = getActiveTestPhone()
   }
   const response = await fetch(`${FUNCTIONS_URL}/${name}`, {
     method: options?.method || 'POST',
@@ -182,7 +199,7 @@ export type PlaceOrderRequest = {
     quantity: number
     price: number
     tax_percentage: number
-    addons: Array<{ id: string; name: string; price: number }>
+    addons: Array<{ id: string; name: string; price: number; group_name: string }>
   }>
 }
 
@@ -233,6 +250,17 @@ export type CustomerAddress = {
   created_at: string
 }
 
+export type LoyaltyReward = {
+  id: string
+  type: 'CASHBACK' | 'FREE_CATEGORY' | string
+  name: string
+  description: string
+  isEligible: boolean
+  ineligibilityReason?: string
+  cashback?: { availableAmount: number; maxRedeemableNow: number }
+  freeCategory?: { internalCategoryId: string; categoryName: string }
+}
+
 export type SubscriptionInterval = 'week' | 'month'
 export type SubscriptionStatus = 'active' | 'paused' | 'past_due' | 'cancelled' | 'cancelled_payment_failed'
 
@@ -269,7 +297,7 @@ export const api = {
     ),
 
   getAvailableRewards: (customerId: string, orderAmount: number) =>
-    callFunction<{ rewards: Array<{ id: string; name: string; type: string; balance: number; redeemable: boolean }> }>(
+    callFunction<{ success?: boolean; rewards: LoyaltyReward[] }>(
       'loyalty-rewards',
       { customerId, orderAmount }
     ),
@@ -283,11 +311,19 @@ export const api = {
   placeOrder: (order: PlaceOrderRequest) =>
     callFunction<PlaceOrderResponse>('external-order', order),
 
+  cancelOrder: (orderId: string, reason: string) =>
+    callFunction<{ success: boolean; message?: string }>('cancel-order', {
+      order_id: orderId,
+      cancel_reason: reason,
+      cancelled_by: 'customer',
+    }),
+
   getCustomerOrders: (page = 1, limit = 10, activeOnly = false) =>
     callFunction<CustomerOrders>('customer-orders', { page, limit, activeOnly }),
 
-  getSubscriptions: () =>
-    callFunction<CustomerSubscriptions>('subscriptions', undefined, { method: 'GET' }),
+  // Product subscriptions are not yet implemented server-side (no `subscriptions` edge function
+  // or table). Return an empty list so the UI renders the empty state without a 404 on every load.
+  getSubscriptions: async (): Promise<CustomerSubscriptions> => ({ success: true, subscriptions: [] }),
 
   // Online store (beans)
   createOnlineOrder: (input: OnlineOrderRequest) =>
@@ -295,6 +331,11 @@ export const api = {
 
   createCashfreeOrder: (input: OnlineOrderRequest) =>
     callFunction<CashfreeOrderResponse>('cashfree-order-create', input),
+
+  // Cafe (pickup/delivery/dine-in) online payment via Cashfree.
+  // Same endpoint as shop, differentiated by the `order_type: 'cafe'` discriminator.
+  createCashfreeCafeOrder: (input: PlaceOrderRequest) =>
+    callFunction<CashfreeOrderResponse>('cashfree-order-create', { order_type: 'cafe', ...input }),
 
   verifyRazorpayPayment: (input: VerifyPaymentRequest) =>
     callFunction<{ success: boolean; order_id: string; status: string; cashback_awarded?: number }>(

@@ -141,7 +141,7 @@ describe('useReorder', () => {
       name: 'Espresso',
       price: 150,
       quantity: 2,
-      addons: [{ id: 'addon-001', name: 'Oat Milk', price: 30 }],
+      addons: [{ id: 'addon-001', name: 'Oat Milk', price: 30, groupName: 'Milk' }],
       specialInstructions: '',
     }))
     expect(toast.success).toHaveBeenCalledWith('Added 1 items to cart.')
@@ -178,6 +178,33 @@ describe('useReorder', () => {
     act(() => result.current.reorder())
     expect(toast.error).toHaveBeenCalledWith('No items from your last order are available right now.')
     expect(mockNavigate).not.toHaveBeenCalled()
+  })
+
+  it('scopes to targetOrder argument instead of most-recent reorderable', () => {
+    const newer = { ...mockOrderDelivered, id: 'newer', reorder_payload: mockReorderPayload }
+    const older = {
+      ...mockOrderDelivered,
+      id: 'older',
+      reorder_payload: {
+        kind: 'cafe' as const,
+        items: [{ petpooja_item_id: 'unknown-item', item_name: 'Gone', quantity: 1, addons: [] }],
+      },
+    }
+    mockOrdersData = { orders: [newer, older] }
+    mockMenuData = mockMenu
+    const { result } = renderHook(() => useReorder(older))
+    expect(result.current.canReorder).toBe(true)
+    act(() => result.current.reorder())
+    expect(toast.error).toHaveBeenCalledWith('No items from your last order are available right now.')
+    expect(mockAddCafeItem).not.toHaveBeenCalled()
+  })
+
+  it('canReorder is false when targetOrder is cancelled even if a newer one is reorderable', () => {
+    const cancelled = { ...mockOrderDelivered, id: 'c', status: 'cancelled' }
+    mockOrdersData = { orders: [mockOrderDelivered, cancelled] }
+    mockMenuData = mockMenu
+    const { result } = renderHook(() => useReorder(cancelled))
+    expect(result.current.canReorder).toBe(false)
   })
 
   it('reorder() skips missing addons but still adds the parent item', () => {

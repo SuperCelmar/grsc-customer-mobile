@@ -2,6 +2,8 @@ import { createContext, useContext, useState, useEffect } from 'react'
 import type { ReactNode } from 'react'
 import { supabase } from '../../lib/supabase'
 
+const TARGET_STORE_NAME = 'Store nbq7ky1z'
+
 type StoreInfo = {
   storeId: string
   storeName: string
@@ -20,24 +22,18 @@ export function OrderingProvider({ children }: { children: ReactNode }) {
   const [storeLoading, setStoreLoading] = useState(true)
 
   useEffect(() => {
-    // DEV mock: use fake store info when Twilio/backend isn't configured
-    const isDevMock = import.meta.env.DEV && (() => { try { return sessionStorage.getItem('grsc_dev_session') === '1' } catch { return false } })()
-    if (isDevMock) {
-      setStoreInfo({ storeId: 'mock-store-001', storeName: 'GoldRush Jubilee Hills', petpoojaRestaurantId: 'mock-rest-001' })
-      setStoreLoading(false)
-      return
-    }
-
     supabase
       .from('stores')
-      .select('store_id, store_name, petpooja_restaurant_id')
-      .limit(1)
+      .select('store_id, store_name, city, petpooja_restaurant_id')
+      .eq('store_name', TARGET_STORE_NAME)
       .single()
       .then(({ data }) => {
         if (data) {
           setStoreInfo({
             storeId: data.store_id,
-            storeName: data.store_name,
+            // Display the city as the user-facing label (e.g. "Hyderabad")
+            // rather than the generated store_name (e.g. "Store nbq7ky1z").
+            storeName: data.city,
             petpoojaRestaurantId: data.petpooja_restaurant_id,
           })
         }

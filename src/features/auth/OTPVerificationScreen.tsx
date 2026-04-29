@@ -1,19 +1,16 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
-import { useAuth } from '../../contexts/AuthContext'
 
 export function OTPVerificationScreen() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { setDevSession } = useAuth()
   const phone = (location.state as { phone?: string })?.phone || ''
-  const testPhone = import.meta.env.DEV ? import.meta.env.VITE_TEST_PHONE : undefined
   const testOtp = import.meta.env.DEV ? import.meta.env.VITE_TEST_OTP : undefined
-  const isTestPhone = testPhone && phone === testPhone
+  const autoFillOtp = import.meta.env.DEV && !!testOtp
 
   const [digits, setDigits] = useState<string[]>(() =>
-    isTestPhone && testOtp ? testOtp.split('') : ['', '', '', '', '', '']
+    autoFillOtp && testOtp ? testOtp.split('') : ['', '', '', '', '', '']
   )
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -25,9 +22,9 @@ export function OTPVerificationScreen() {
     if (!phone) navigate('/login', { replace: true })
   }, [phone, navigate])
 
-  // Auto-submit for test phone
+  // Auto-submit when VITE_TEST_OTP is set (DEV convenience).
   useEffect(() => {
-    if (isTestPhone && testOtp && testOtp.length === 6) {
+    if (autoFillOtp && testOtp && testOtp.length === 6) {
       verify(testOtp)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -59,14 +56,6 @@ export function OTPVerificationScreen() {
     if (!phone) { navigate('/login'); return }
     setLoading(true); setError('')
     try {
-      // DEV bypass: skip Supabase verifyOtp when Twilio isn't configured.
-      // Uses a mock session — authenticated API calls will return 401, but UI is testable.
-      if (isTestPhone && testOtp && otp === testOtp) {
-        setDevSession(phone)
-        navigate('/dashboard', { replace: true })
-        return
-      }
-
       const { error } = await supabase.auth.verifyOtp({ phone: '+91' + phone, token: otp, type: 'sms' })
       if (error) {
         if (error.message.includes('expired')) setError('Code expired. Request a new one.')

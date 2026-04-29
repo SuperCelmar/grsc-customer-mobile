@@ -20,15 +20,18 @@ function CategoryPill({
   active,
   onClick,
   Icon,
+  categoryId,
 }: {
   label: string
   active: boolean
   onClick: () => void
   Icon: CategoryIcon | null
+  categoryId: string
 }) {
   return (
     <button
       onClick={onClick}
+      data-category-id={categoryId}
       className="flex-shrink-0 flex items-center px-4 py-2 rounded-md text-sm font-medium border transition-colors"
       style={{
         height: 40,
@@ -176,6 +179,42 @@ function MenuBrowseInner() {
     ]
   }, [menuData])
 
+  // Index of category ids that contain a product matching the current query, in `categories` order.
+  const matchingCategoryIds = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!menuData || !q) return [] as string[]
+    const ids = new Set<string>()
+    for (const p of menuData.products) {
+      if (!p.name.toLowerCase().includes(q)) continue
+      for (const cid of p.category_ids) ids.add(cid)
+    }
+    const onlineProducts = menuData.online_products ?? []
+    for (const p of onlineProducts) {
+      if (!p.name.toLowerCase().includes(q)) continue
+      if (p.category_name === 'Performance Coffee') ids.add('online-performance-coffee')
+      else if (p.category_name === 'Hampers') ids.add('online-hampers')
+    }
+    return categories.map(c => c.id).filter(id => ids.has(id))
+  }, [menuData, categories, search])
+
+  // Auto-switch to first matching category when current category has no matches.
+  // Debounced 200ms so fast typing doesn't flicker between categories.
+  useEffect(() => {
+    const q = search.trim()
+    if (!q || matchingCategoryIds.length === 0) return
+    if (matchingCategoryIds.includes(selectedCategory)) return
+    const t = setTimeout(() => setSelectedCategory(matchingCategoryIds[0]), 200)
+    return () => clearTimeout(t)
+  }, [search, matchingCategoryIds, selectedCategory])
+
+  // Scroll the active category pill into view when it changes.
+  const categoryStripRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (!selectedCategory) return
+    const el = categoryStripRef.current?.querySelector(`[data-category-id="${selectedCategory}"]`)
+    el?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
+  }, [selectedCategory])
+
   // Auto-select first category + honor ?category= if valid
   useEffect(() => {
     if (!menuData || applied.current) return
@@ -221,7 +260,7 @@ function MenuBrowseInner() {
   }
 
   const isOpen = storeStatus?.store_status === '1'
-  const { store, products } = menuData
+  const { products } = menuData
   const onlineProducts = menuData.online_products ?? []
 
   const isOnlineCategory = selectedCategory === 'online-performance-coffee' || selectedCategory === 'online-hampers'
@@ -258,6 +297,7 @@ function MenuBrowseInner() {
       return
     }
     // Simple quick-add: no addons
+    const wasEmpty = cartCount === 0
     const cartItemId =
       typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
         ? crypto.randomUUID()
@@ -272,12 +312,13 @@ function MenuBrowseInner() {
       addons: [],
       specialInstructions: '',
     })
+    if (wasEmpty) setCartOpen(true)
   }
 
   return (
     <div className="flex flex-col min-h-screen pb-20">
       <ScreenHeader
-        title={store.name}
+        title={`Store ${storeInfo?.storeName ?? ''}`.trim()}
         showStatus
         isOpen={isOpen}
         statusLabel={isOpen ? `Open Now · Pickup ~15 min` : 'Currently Closed'}
@@ -293,6 +334,7 @@ function MenuBrowseInner() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search menu..."
+            aria-label="Search across all menu categories"
             className="w-full border border-card rounded-lg px-3 py-2 text-sm pl-8 focus:outline-none focus:border-primary"
           />
           <svg className="absolute left-2.5 top-2.5 w-4 h-4 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -324,10 +366,11 @@ function MenuBrowseInner() {
             </svg>
           </span>
         </div>
-        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+        <div ref={categoryStripRef} className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
           {categories.map(cat => (
             <CategoryPill
               key={cat.id}
+              categoryId={cat.id}
               label={cat.name}
               active={selectedCategory === cat.id}
               onClick={() => setSelectedCategory(cat.id)}
@@ -338,9 +381,24 @@ function MenuBrowseInner() {
       </div>
 
       {/* Product grid */}
-      <div className="flex-1 px-4 py-3">
+      <div className="flex-1 px-4 py-3" role="region" aria-live="polite" aria-atomic="true">
         {totalCount === 0 ? (
-          <p className="text-[var(--text-secondary)] text-sm text-center mt-8">No items found.</p>
+          <div role="status" className="text-center mt-8 space-y-2">
+            <p className="text-[var(--text-secondary)] text-sm">
+              {search.trim()
+                ? <>No items match <span className="font-medium text-[var(--text)]">"{search.trim()}"</span>.</>
+                : 'No items in this category.'}
+            </p>
+            {search.trim() && (
+              <button
+                onClick={() => setSearch('')}
+                className="text-sm font-medium"
+                style={{ color: 'var(--primary)' }}
+              >
+                Clear search
+              </button>
+            )}
+          </div>
         ) : (
           <div className="grid grid-cols-2 gap-3">
             {filteredCafe.map(product => (

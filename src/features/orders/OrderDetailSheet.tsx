@@ -38,7 +38,7 @@ function getFooterCTAs(status: string, storePhone?: string | null): FooterCTAs {
 
 export function OrderDetailSheet({ order, onClose }: Props) {
   const navigate = useNavigate()
-  const { reorder, canReorder } = useReorder()
+  const { reorder, canReorder } = useReorder(order)
 
   const handleTrackOrder = () => {
     onClose()
@@ -65,11 +65,11 @@ export function OrderDetailSheet({ order, onClose }: Props) {
   const footerCTAs = getFooterCTAs(order.status)
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col justify-end">
+    <div className="fixed inset-0 z-[60] flex flex-col justify-end">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="relative bg-white rounded-t-2xl max-h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="sticky top-0 bg-white px-4 pt-4 pb-3 border-b border-[#E8DDD0] rounded-t-2xl">
+        <div className="sticky top-0 bg-white px-4 pt-4 pb-3 border-b border-[#E8DDD0] rounded-t-2xl z-10">
           <div className="pr-16">
             <p className="text-[11px] text-[#6B6560] uppercase tracking-wide">Pickup from</p>
             <h2 className="text-[20px] font-bold text-[#1A1410] leading-tight" style={{ fontFamily: 'serif' }}>
@@ -83,8 +83,8 @@ export function OrderDetailSheet({ order, onClose }: Props) {
             <span
               className="text-xs px-2 py-0.5 rounded-full font-medium"
               style={{
-                backgroundColor: isCancelled ? '#FEE2E2' : isCompleted ? '#F0F4E8' : 'var(--muted)',
-                color: isCancelled ? '#B42C1F' : isCompleted ? '#6B8E23' : 'var(--primary)',
+                backgroundColor: isCancelled ? '#FEE2E2' : isCompleted ? '#F0F4E8' : 'rgba(212,165,116,0.15)',
+                color: isCancelled ? '#B42C1F' : isCompleted ? '#6B8E23' : '#A0826D',
               }}
             >{statusLabel}</span>
             <button onClick={onClose} className="text-[#6B6560] text-xl p-1 leading-none">×</button>
@@ -92,7 +92,7 @@ export function OrderDetailSheet({ order, onClose }: Props) {
         </div>
 
         {/* Scrollable body */}
-        <div className="overflow-y-auto flex-1 px-4 py-4 space-y-4 pb-[132px]">
+        <div className="overflow-y-auto flex-1 px-4 py-4 space-y-4 pb-40">
           {/* Items */}
           <div>
             <h3 className="text-xs font-semibold text-[#6B6560] uppercase tracking-wide mb-2">Items</h3>
@@ -132,55 +132,53 @@ export function OrderDetailSheet({ order, onClose }: Props) {
 
         {/* Sticky footer CTA */}
         <div
-          className="absolute bottom-0 left-0 right-0 bg-white px-4 py-3"
-          style={{ boxShadow: '0 -2px 8px rgba(0,0,0,0.08)' }}
+          className="absolute bottom-0 left-0 right-0 bg-white px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+16px)]"
+          style={{ boxShadow: '0 -4px 12px rgba(0,0,0,0.05)' }}
         >
           {footerCTAs.type === 'active' && (
-            <>
+            <div className="flex flex-col gap-2">
               <button
                 onClick={footerCTAs.storePhone ? () => { window.location.href = `tel:${footerCTAs.storePhone}` } : undefined}
                 disabled={!footerCTAs.storePhone}
-                className="w-full mb-2 py-2 rounded-[6px] text-sm font-medium text-[#D4A574] bg-white disabled:opacity-40"
-                style={{ border: '1px solid #D4A574' }}
+                className="w-full py-2.5 rounded-[6px] text-sm font-medium text-[#D4A574] bg-white border border-[#D4A574] disabled:opacity-40 active:scale-[0.98] transition-transform"
               >
                 Contact store
               </button>
               <button
                 onClick={handleTrackOrder}
-                className="w-full h-12 rounded-[6px] text-[15px] font-medium text-[#1A1410] shadow-sm"
+                className="w-full h-12 rounded-[6px] text-[15px] font-semibold text-[#1A1410] shadow-sm active:scale-[0.98] transition-transform"
                 style={{ backgroundColor: '#D4A574' }}
               >
                 Track order
               </button>
-            </>
+            </div>
           )}
 
           {footerCTAs.type === 'completed' && (
-            <>
+            <div className="flex flex-col gap-2">
               <button
                 onClick={handleViewReceipt}
-                className="w-full mb-2 py-2 rounded-[6px] text-sm font-medium text-[#D4A574] bg-white"
-                style={{ border: '1px solid #D4A574' }}
+                className="w-full py-2.5 rounded-[6px] text-sm font-medium text-[#D4A574] bg-white border border-[#D4A574] active:scale-[0.98] transition-transform"
               >
                 View receipt
               </button>
               <button
                 onClick={handleReorder}
                 disabled={!canReorder}
-                className="w-full h-12 rounded-[6px] text-[15px] font-medium text-[#1A1410] shadow-sm disabled:opacity-40"
-                style={{ backgroundColor: '#D4A574' }}
+                className="w-full h-12 rounded-[6px] text-[15px] font-semibold text-[#1A1410] shadow-sm disabled:bg-[#E8DDD0] disabled:text-[#6B6560] disabled:shadow-none active:scale-[0.98] transition-transform"
+                style={{ backgroundColor: canReorder ? '#D4A574' : undefined }}
               >
-                Reorder
+                {canReorder ? 'Reorder' : 'Reorder unavailable'}
               </button>
-            </>
+            </div>
           )}
 
           {footerCTAs.type === 'cancelled' && (
             <button
               onClick={handleReorder}
               disabled={!canReorder}
-              className="w-full h-12 rounded-[6px] text-[15px] font-medium text-[#1A1410] shadow-sm disabled:opacity-40"
-              style={{ backgroundColor: '#D4A574' }}
+              className="w-full h-12 rounded-[6px] text-[15px] font-semibold text-[#1A1410] shadow-sm disabled:bg-[#E8DDD0] disabled:text-[#6B6560] active:scale-[0.98] transition-transform"
+              style={{ backgroundColor: canReorder ? '#D4A574' : undefined }}
             >
               Reorder
             </button>

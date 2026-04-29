@@ -19,13 +19,6 @@ export function PhoneEntryScreen() {
     }
     setLoading(true)
     try {
-      // DEV bypass: skip Supabase OTP when Twilio isn't configured
-      const testPhone = import.meta.env.DEV ? import.meta.env.VITE_TEST_PHONE : undefined
-      if (testPhone && phone === testPhone) {
-        navigate('/otp', { state: { phone } })
-        return
-      }
-
       const { error } = await supabase.auth.signInWithOtp({
         phone: '+91' + phone,
         options: { channel: 'sms' }

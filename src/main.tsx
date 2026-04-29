@@ -8,8 +8,10 @@ import { AuthProvider } from './contexts/AuthContext'
 import { CartProvider } from './contexts/CartContext'
 import { initSentry } from './lib/sentry'
 import { ErrorFallback } from './components/ErrorFallback'
+import { registerCashfreeSessionLogoutClear } from './features/ordering/useCashfreeSession'
 
 initSentry()
+registerCashfreeSessionLogoutClear()
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 2, staleTime: 30_000 } }

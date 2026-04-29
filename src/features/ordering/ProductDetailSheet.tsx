@@ -51,11 +51,13 @@ export function ProductDetailSheet({ product, onClose, onViewCart }: Props) {
 
   function handleAddToCart() {
     if (!canAddToCart()) return
+    const wasEmpty = cartCount === 0
     const addons = product.addon_groups.flatMap(g =>
       g.addons.filter(a => isAddonSelected(g.id, a.id)).map(a => ({
         id: a.code,
         name: a.name,
         price: a.price,
+        groupName: g.name,
       }))
     )
     const cartItemId =
@@ -73,6 +75,7 @@ export function ProductDetailSheet({ product, onClose, onViewCart }: Props) {
       specialInstructions,
     })
     onClose()
+    if (wasEmpty) onViewCart?.()
   }
 
   const totalPrice = (product.price + getAddonPrice()) * quantity

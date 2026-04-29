@@ -4,25 +4,29 @@ import { toast } from 'sonner'
 import { useCustomerOrders, useStoreMenu } from '../../hooks/useCustomerProfile'
 import { useCart } from '../../contexts/CartContext'
 import { useOrdering } from '../ordering/OrderingContext'
-import type { ReorderPayload } from '../../lib/api'
+import type { CustomerOrders, ReorderPayload } from '../../lib/api'
 
-export function useReorder() {
+type Order = CustomerOrders['orders'][number]
+
+const isReorderable = (o: Order): boolean =>
+  ['delivered', 'completed', 'done'].includes(o.status.toLowerCase()) && !!o.reorder_payload
+
+export function useReorder(targetOrder?: Order) {
   const { data, isLoading } = useCustomerOrders(1)
   const { storeInfo } = useOrdering()
   const { data: menu } = useStoreMenu(storeInfo?.storeId || '')
   const { addCafeItem, clearCafeCart } = useCart()
   const navigate = useNavigate()
 
-  const lastReorderable = useMemo(() =>
-    data?.orders?.find(o =>
-      ['delivered', 'completed', 'done'].includes(o.status.toLowerCase()) && o.reorder_payload
-    ) ?? null
-  , [data])
+  const sourceOrder = useMemo(() => {
+    if (targetOrder) return isReorderable(targetOrder) ? targetOrder : null
+    return data?.orders?.find(isReorderable) ?? null
+  }, [targetOrder, data])
 
-  const canReorder = !!lastReorderable && !!menu
+  const canReorder = !!sourceOrder && !!menu
 
   const reorder = () => {
-    const payload = lastReorderable?.reorder_payload as ReorderPayload | null | undefined
+    const payload = sourceOrder?.reorder_payload as ReorderPayload | null | undefined
     if (!payload || !menu) return
     clearCafeCart()
     let added = 0, skipped = 0
@@ -35,7 +39,7 @@ export function useReorder() {
       const resolvedAddons = item.addons.flatMap(a => {
         for (const group of menuProduct.addon_groups) {
           const found = group.addons.find(ad => ad.id === a.petpooja_addon_id)
-          if (found) return [{ id: found.id, name: found.name, price: found.price }]
+          if (found) return [{ id: found.id, name: found.name, price: found.price, groupName: group.name }]
         }
         return []
       })

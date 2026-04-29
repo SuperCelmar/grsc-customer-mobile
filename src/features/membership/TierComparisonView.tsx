@@ -21,30 +21,23 @@ const TIER_CONFIG = [
   },
 ]
 
-const LEGEND_CONFIG = {
-  key: 'legend',
-  name: 'Legend',
-  price: 'Earned',
-  cashbackRate: 15,
-  color: '#D4A574',
-}
-
 type TierComparisonViewProps = {
   currentTier?: 'pro' | 'elite' | 'legend' | null
+  greeting?: string | null
 }
 
-export function TierComparisonView({ currentTier }: TierComparisonViewProps) {
+export function TierComparisonView({ currentTier, greeting }: TierComparisonViewProps) {
   return (
-    <div className="flex flex-col min-h-screen bg-[#FFFFFF]">
+    <div className="flex flex-col bg-[#FFFFFF]">
       <div className="px-4 pt-10 pb-4">
         <h1 className="font-serif text-2xl font-bold text-[#1A1410]">Choose Your Plan</h1>
         <p className="text-sm text-[#6B6560] mt-1">
-          Unlock cashback, free coffees, and more.
+          {greeting ? `Hi, ${greeting} — unlock cashback, free coffees, and more.` : 'Unlock cashback, free coffees, and more.'}
         </p>
       </div>
 
-      {/* Swipeable tier cards */}
-      <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory px-4 pb-4 scrollbar-none">
+      {/* 2-column grid: Pro + Elite */}
+      <div className="grid grid-cols-2 gap-3 px-4 pb-4">
         {TIER_CONFIG.map((tier) => (
           <TierCard
             key={tier.key}
@@ -58,27 +51,18 @@ export function TierComparisonView({ currentTier }: TierComparisonViewProps) {
             onSelect={currentTier !== tier.key ? () => {} : undefined}
           />
         ))}
-
-        {/* Legend — earned, not purchasable */}
-        <TierCard
-          key="legend"
-          name={LEGEND_CONFIG.name}
-          price={LEGEND_CONFIG.price}
-          cashbackRate={LEGEND_CONFIG.cashbackRate}
-          isCurrent={currentTier === 'legend'}
-          isEarned
-          color={LEGEND_CONFIG.color}
-        />
       </div>
 
-      {/* Legend explainer */}
-      <div className="mx-4 mt-2 rounded-lg bg-[#F5EFE9] p-4">
-        <p className="text-sm font-semibold text-[#1A1410]">How to earn Legend</p>
-        <p className="text-sm text-[#6B6560] mt-1">
-          Reach Elite and accumulate enough spend to unlock Legend status automatically.
-          Legend gives you 15% cashback and a daily free coffee — for life.
-        </p>
+      {/* Legend — aspirational footer, not a purchasable card */}
+      <div className="mx-4 mt-3 px-3 py-2 rounded-[6px] bg-[#F5EFE9] flex items-center justify-between">
+        <div>
+          <p className="text-[13px] font-semibold text-[#1A1410]">LEGEND</p>
+          <p className="text-[12px] text-[#6B6560]">15% cashback · daily free coffee — earned at scale</p>
+        </div>
+        <span className="text-[20px] text-[#A0826D]">∞</span>
       </div>
+
+      <div className="pb-3" />
     </div>
   )
 }

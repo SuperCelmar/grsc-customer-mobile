@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, act } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { ActiveOrderTracker } from '../ActiveOrderTracker'
 
 const mockUnsubscribe = vi.fn()
@@ -7,84 +8,121 @@ const mockSubscribe = vi.fn().mockReturnThis()
 const mockOn = vi.fn().mockReturnThis()
 const mockChannel = { on: mockOn, subscribe: mockSubscribe, unsubscribe: mockUnsubscribe }
 
-// Keep a reference the factory can close over without the hoisting issue
-let resolvedData: object | null = null
+vi.mock('../../../lib/supabase', () => ({
+  supabase: {
+    channel: vi.fn(() => mockChannel),
+  },
+}))
 
-vi.mock('../../../lib/supabase', () => {
-  const mockMaybeSingle = vi.fn().mockImplementation(() => Promise.resolve({ data: resolvedData, error: null }))
-  const mockOrder = vi.fn().mockReturnValue({ maybeSingle: mockMaybeSingle })
-  const mockEq = vi.fn().mockReturnValue({ order: mockOrder, maybeSingle: mockMaybeSingle })
-  const mockSelect = vi.fn().mockReturnValue({ eq: mockEq })
-  const mockFrom = vi.fn().mockReturnValue({ select: mockSelect })
+vi.mock('../../../lib/api', () => ({
+  api: { cancelOrder: vi.fn() },
+}))
+
+const mockFetchOrderWithRetry = vi.fn()
+vi.mock('../lib/fetchOrderWithRetry', () => ({
+  fetchOrderWithRetry: (...args: unknown[]) => mockFetchOrderWithRetry(...args),
+}))
+
+function makeOrderData(fulfillment_status: string, events: object[] = [], extra: object = {}) {
   return {
-    supabase: {
-      from: mockFrom,
-      channel: vi.fn(() => mockChannel),
-    },
-  }
-})
-
-function setOrderState(fulfillment_status: string, events: object[] = []) {
-  resolvedData = {
     fulfillment_status,
     source_order_id: 'PP-12345',
+    payment_status: null,
     order_fulfillment_events: events,
+    ...extra,
   }
+}
+
+const VALID_UUID = '123e4567-e89b-12d3-a456-426614174000'
+
+function renderTracker(orderId: string) {
+  return render(
+    <MemoryRouter>
+      <ActiveOrderTracker orderId={orderId} />
+    </MemoryRouter>
+  )
 }
 
 beforeEach(() => {
   vi.clearAllMocks()
   mockOn.mockReturnThis()
   mockSubscribe.mockReturnThis()
-  resolvedData = null
+  mockFetchOrderWithRetry.mockResolvedValue(null)
 })
 
 describe('ActiveOrderTracker', () => {
   it('renders PLACED state with order id', async () => {
-    setOrderState('PLACED')
-    render(<ActiveOrderTracker orderId="order-uuid-1" />)
+    mockFetchOrderWithRetry.mockResolvedValue(makeOrderData('PLACED'))
+    renderTracker(VALID_UUID)
     expect(await screen.findByText('PP-12345')).toBeInTheDocument()
     expect(await screen.findByText('Placed')).toBeInTheDocument()
   })
 
   it('renders CONFIRMED state', async () => {
-    setOrderState('CONFIRMED', [
+    mockFetchOrderWithRetry.mockResolvedValue(makeOrderData('CONFIRMED', [
       { id: 'e1', to_state: 'CONFIRMED', created_at: '2026-04-19T10:00:00Z' },
-    ])
-    render(<ActiveOrderTracker orderId="order-uuid-2" />)
+    ]))
+    renderTracker(VALID_UUID)
     expect(await screen.findByText('Confirmed')).toBeInTheDocument()
   })
 
   it('renders PACKED state', async () => {
-    setOrderState('PACKED')
-    render(<ActiveOrderTracker orderId="order-uuid-3" />)
+    mockFetchOrderWithRetry.mockResolvedValue(makeOrderData('PACKED'))
+    renderTracker(VALID_UUID)
     expect(await screen.findByText('Packed')).toBeInTheDocument()
   })
 
   it('renders DISPATCHED state', async () => {
-    setOrderState('DISPATCHED')
-    render(<ActiveOrderTracker orderId="order-uuid-4" />)
+    mockFetchOrderWithRetry.mockResolvedValue(makeOrderData('DISPATCHED'))
+    renderTracker(VALID_UUID)
     expect(await screen.findByText('On the way')).toBeInTheDocument()
   })
 
   it('renders DELIVERED state', async () => {
-    setOrderState('DELIVERED')
-    render(<ActiveOrderTracker orderId="order-uuid-5" />)
+    mockFetchOrderWithRetry.mockResolvedValue(makeOrderData('DELIVERED'))
+    renderTracker(VALID_UUID)
     expect(await screen.findByText('Delivered')).toBeInTheDocument()
   })
 
   it('renders CANCELLED state with cancel banner', async () => {
-    setOrderState('CANCELLED')
-    render(<ActiveOrderTracker orderId="order-uuid-6" />)
+    mockFetchOrderWithRetry.mockResolvedValue(makeOrderData('CANCELLED'))
+    renderTracker(VALID_UUID)
     expect(await screen.findByText('Order Cancelled')).toBeInTheDocument()
   })
 
   it('shows timestamps from fulfillment events', async () => {
-    setOrderState('CONFIRMED', [
+    mockFetchOrderWithRetry.mockResolvedValue(makeOrderData('CONFIRMED', [
       { id: 'e1', to_state: 'CONFIRMED', created_at: '2026-04-19T10:30:00Z' },
-    ])
-    render(<ActiveOrderTracker orderId="order-uuid-7" />)
+    ]))
+    renderTracker(VALID_UUID)
     const timestamps = await screen.findAllByText(/\d{1,2}:\d{2}/)
     expect(timestamps.length).toBeGreaterThan(0)
+  })
+
+  it('null fetchOrder (order not found) hides Cancel button and shows degraded state', async () => {
+    mockFetchOrderWithRetry.mockResolvedValue(null)
+    renderTracker(VALID_UUID)
+    expect(await screen.findByText(/Couldn't load this order/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Cancel/i })).not.toBeInTheDocument()
+  })
+
+  it('invalid UUID hides Cancel button and shows degraded state immediately', () => {
+    renderTracker('not-a-uuid')
+    expect(screen.getByText(/Couldn't load this order/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Cancel/i })).not.toBeInTheDocument()
+  })
+})
+
+describe('ActiveOrderTracker — retry behavior', () => {
+  it('shows order when fetchOrderWithRetry eventually resolves data', async () => {
+    mockFetchOrderWithRetry.mockResolvedValue(makeOrderData('PLACED'))
+    renderTracker(VALID_UUID)
+    expect(await screen.findByText('PP-12345')).toBeInTheDocument()
+  })
+
+  it('shows fallback when fetchOrderWithRetry returns null', async () => {
+    mockFetchOrderWithRetry.mockResolvedValue(null)
+    renderTracker(VALID_UUID)
+    expect(await screen.findByText(/Couldn't load this order/i)).toBeInTheDocument()
   })
 })

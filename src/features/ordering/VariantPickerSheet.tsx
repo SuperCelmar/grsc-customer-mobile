@@ -55,6 +55,7 @@ export function VariantPickerSheet({ product, onClose, onViewCart }: Props) {
 
   function handleAddToCart() {
     if (!selectedVariant) return
+    const wasEmpty = cartCount === 0
     addShopItem({
       variantId: selectedVariant.variant_id,
       productId: product.id,
@@ -66,6 +67,7 @@ export function VariantPickerSheet({ product, onClose, onViewCart }: Props) {
       subscription: getSubscription(),
     })
     onClose()
+    if (wasEmpty) onViewCart?.()
   }
 
   const effectivePricePaise = selectedVariant

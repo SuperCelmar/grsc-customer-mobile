@@ -23,7 +23,7 @@ export function TierCard({
 }: TierCardProps) {
   return (
     <div
-      className={`relative min-w-[200px] rounded-lg p-5 border-2 bg-white snap-start ${isCurrent ? '' : 'border-[#E8DDD0]'}`}
+      className={`relative rounded-lg p-5 border-2 bg-white ${isCurrent ? '' : 'border-[#E8DDD0]'}`}
       style={{ borderColor: isCurrent ? color : undefined }}
     >
       {isCurrent && (

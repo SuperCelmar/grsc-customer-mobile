@@ -75,8 +75,8 @@ vi.mock('../../subscriptions/useSubscriptions', () => ({
 }))
 
 vi.mock('../TierHero', () => ({
-  TierHero: ({ profile }: { profile: { membership: unknown } }) => (
-    <div data-testid="tier-hero">
+  TierHero: ({ profile, firstName }: { profile: { membership: unknown }; firstName?: string | null }) => (
+    <div data-testid="tier-hero" data-firstname={firstName ?? ''}>
       {profile.membership ? 'MembershipDetailView' : 'TierComparisonView'}
     </div>
   ),
@@ -131,6 +131,17 @@ describe('AccountScreen', () => {
   it('renders Account heading for active member', () => {
     render(<AccountScreen />)
     expect(screen.getByRole('heading', { name: /Account/i })).toBeInTheDocument()
+  })
+
+  it('passes firstName to TierHero', () => {
+    render(<AccountScreen />)
+    expect(screen.getByTestId('tier-hero')).toHaveAttribute('data-firstname', 'Celmar')
+  })
+
+  it('passes null firstName to TierHero when name is null', () => {
+    mockProfile = { ...baseProfile, customer: { ...baseProfile.customer!, name: null } }
+    render(<AccountScreen />)
+    expect(screen.getByTestId('tier-hero')).toHaveAttribute('data-firstname', '')
   })
 
   it('renders TierHero with active membership', () => {

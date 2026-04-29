@@ -4,20 +4,21 @@ import type { AccountProfile } from './types'
 
 type TierHeroProps = {
   profile: AccountProfile
+  firstName?: string | null
 }
 
-export function TierHero({ profile }: TierHeroProps) {
+export function TierHero({ profile, firstName }: TierHeroProps) {
   const membership = profile.membership
 
   if (!membership) {
-    return <TierComparisonView currentTier={null} />
+    return <TierComparisonView currentTier={null} greeting={firstName ?? null} />
   }
 
   const lifetime = profile.lifetime_coffees ?? null
 
   return (
     <div>
-      <MembershipDetailView membership={membership} embedded />
+      <MembershipDetailView membership={membership} embedded firstName={firstName ?? null} />
       {lifetime !== null && lifetime !== undefined && (
         <div className="mx-4 mt-3 flex justify-between text-sm">
           <span className="text-[#6B6560]">Coffees enjoyed</span>

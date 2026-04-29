@@ -43,7 +43,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(mock)
     setSentryUser(mock)
     setLoading(false)
-    try { sessionStorage.setItem('grsc_dev_session', '1') } catch {}
+    try {
+      sessionStorage.setItem('grsc_dev_session', '1')
+      // mock-data.ts uses this to pick the right persona profile
+      sessionStorage.setItem('grsc_dev_phone', phone)
+    } catch {}
   }
 
   return <AuthContext.Provider value={{ session, loading, setDevSession }}>{children}</AuthContext.Provider>

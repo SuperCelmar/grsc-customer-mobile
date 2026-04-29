@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { toast } from 'sonner'
 import { ScreenHeader } from '../../components/ScreenHeader'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCart } from '../../contexts/CartContext'
@@ -8,6 +9,7 @@ import { api } from '../../lib/api'
 import type { CustomerAddress } from '../../lib/api'
 import { useRazorpay } from './useRazorpay'
 import { AddressBottomSheet } from './AddressBottomSheet'
+import { getMissingCheckoutFields } from './checkoutValidation'
 
 export function ShopCheckoutScreen() {
   const navigate = useNavigate()
@@ -123,6 +125,20 @@ export function ShopCheckoutScreen() {
 
   const subtotalRupees = shopSubtotalPaise / 100
 
+  const missingFields = getMissingCheckoutFields({ selectedAddressId })
+  const hasMissing = missingFields.length > 0
+
+  function handleCtaClick() {
+    if (loading) return
+    if (hasMissing) {
+      const first = missingFields[0]
+      toast.error(first.label)
+      document.getElementById(first.sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      return
+    }
+    handlePay()
+  }
+
   return (
     <div className="min-h-screen bg-[var(--muted)] max-w-[430px] mx-auto flex flex-col">
       <ScreenHeader
@@ -151,7 +167,7 @@ export function ShopCheckoutScreen() {
           ))}
         </div>
 
-        <div className="bg-white rounded-lg border border-[var(--card)] p-3 space-y-3">
+        <div id="checkout-address-section" className="bg-white rounded-lg border border-[var(--card)] p-3 space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-[var(--text)]">Delivery Address</h2>
             <button
@@ -226,11 +242,25 @@ export function ShopCheckoutScreen() {
       </div>
 
       <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-white border-t border-[var(--card)] px-4 py-3">
+        {hasMissing && !loading && (
+          <div
+            id="checkout-hint"
+            role="status"
+            aria-live="polite"
+            className="mb-2 px-3 py-2 rounded-lg text-xs flex items-start gap-2"
+            style={{ backgroundColor: 'var(--muted)', color: 'var(--text-secondary)' }}
+          >
+            <span aria-hidden="true">⚠️</span>
+            <span>{missingFields[0].label}</span>
+          </div>
+        )}
         <button
-          onClick={handlePay}
-          disabled={loading || !selectedAddressId}
+          onClick={handleCtaClick}
+          disabled={loading}
+          aria-disabled={hasMissing}
+          aria-describedby={hasMissing ? 'checkout-hint' : undefined}
           className="w-full py-3 rounded-lg text-white font-semibold disabled:opacity-50"
-          style={{ backgroundColor: 'var(--primary)' }}
+          style={{ backgroundColor: 'var(--primary)', opacity: hasMissing && !loading ? 0.5 : undefined }}
         >
           {loading
             ? <span className="flex items-center justify-center gap-2">

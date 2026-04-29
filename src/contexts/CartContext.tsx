@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 
-type AddonSelection = { id: string; name: string; price: number }
+type AddonSelection = { id: string; name: string; price: number; groupName: string }
 
 export type CafeCartItem = {
   cartItemId: string

@@ -1,15 +1,18 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { toast } from 'sonner'
 import { ScreenHeader } from '../../components/ScreenHeader'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCart } from '../../contexts/CartContext'
 import { useCustomerProfile, useStoreStatus } from '../../hooks/useCustomerProfile'
 import { useOrdering } from './OrderingContext'
 import { api } from '../../lib/api'
-import type { CustomerAddress, PlaceOrderRequest } from '../../lib/api'
+import type { CustomerAddress, LoyaltyReward, PlaceOrderRequest } from '../../lib/api'
 import { useRazorpay } from './useRazorpay'
 import { useCashfree } from './useCashfree'
 import { AddressBottomSheet } from './AddressBottomSheet'
+import { getMissingCheckoutFields } from './checkoutValidation'
+import { RewardPicker } from '../orders/RewardPicker'
 
 type PaymentResult = { shopOrderId: string } | { cancelled: true }
 
@@ -44,6 +47,7 @@ export function UnifiedCheckoutScreen() {
   const [manualAddressId, setManualAddressId] = useState<string | null>(null)
   const [showAddressSheet, setShowAddressSheet] = useState(false)
   const [paymentType, setPaymentType] = useState<'COD' | 'ONLINE' | 'CARD'>('ONLINE')
+  const [selectedReward, setSelectedReward] = useState<LoyaltyReward | null>(null)
   const [loading, setLoading] = useState(false)
   const [banner, setBanner] = useState<string | null>(null)
 
@@ -60,8 +64,30 @@ export function UnifiedCheckoutScreen() {
 
   const taxEstimate = Math.round(cafeSubtotal * 0.18)
   const cafeTotal = cafeSubtotal + taxEstimate
+  const rewardDiscount = selectedReward
+    ? Math.min(selectedReward.cashback?.maxRedeemableNow ?? 0, cafeTotal)
+    : 0
+  const payableCafeTotal = Math.max(0, cafeTotal - rewardDiscount)
   const shopSubtotal = shopSubtotalPaise / 100
-  const grandTotal = cafeTotal + shopSubtotal
+  const grandTotal = payableCafeTotal + shopSubtotal
+
+  const missingFields = getMissingCheckoutFields({
+    selectedAddressId,
+    isStoreOpen,
+    hasCafeItems: cafeCount > 0,
+  })
+  const hasMissing = missingFields.length > 0
+
+  function handleCtaClick() {
+    if (loading) return
+    if (hasMissing) {
+      const first = missingFields[0]
+      toast.error(first.label)
+      document.getElementById(first.sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      return
+    }
+    handlePay()
+  }
 
   function handleBack() {
     if ((location.key ?? 'default') !== 'default') navigate(-1)
@@ -174,9 +200,9 @@ export function UnifiedCheckoutScreen() {
         restID: storeInfo?.petpoojaRestaurantId ?? '',
         order_type: 'P',
         payment_type: paymentType,
-        total: cafeTotal,
+        total: payableCafeTotal,
         tax_total: taxEstimate,
-        discount_total: 0,
+        discount_total: rewardDiscount,
       },
       items: cafeCart.map(item => ({
         id: item.productCode,
@@ -184,7 +210,7 @@ export function UnifiedCheckoutScreen() {
         quantity: item.quantity,
         price: item.price,
         tax_percentage: 18,
-        addons: item.addons.map(a => ({ id: a.id, name: a.name, price: a.price })),
+        addons: item.addons.map(a => ({ id: a.id, name: a.name, price: a.price, group_name: a.groupName ?? '' })),
       })),
     }
   }
@@ -215,20 +241,76 @@ export function UnifiedCheckoutScreen() {
 
       let cafeOrderId: string | null = null
       try {
-        const res = await api.placeOrder(buildCafePayload())
-        cafeOrderId = res.order_id
+        const cafePayload = buildCafePayload()
+
+        if (paymentType !== 'COD') {
+          // Online cafe payment — open a second Cashfree session for the cafe portion.
+          let order_id: string
+          let payment_session_id: string
+          try {
+            ;({ order_id, payment_session_id } = await api.createCashfreeCafeOrder(cafePayload))
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : 'Payment could not be started'
+            console.error('cashfree-cafe: session creation failed', { phase: 'cashfree-cafe', err })
+            toast.error(msg)
+            throw err
+          }
+          await new Promise<void>((resolve, reject) => {
+            openCashfree({
+              payment_session_id,
+              order_id,
+              onSuccess: (paidId) => { cafeOrderId = paidId; resolve() },
+              onFailure: (msg) => {
+                console.error('cashfree-cafe: payment failure', { phase: 'openCashfree', order_id, payment_session_id, msg })
+                toast.error(msg || 'Cafe payment could not be completed')
+                reject(new Error(msg))
+              },
+            }).catch(reject)
+          })
+        } else {
+          // COD — place via external-order as before.
+          const res = await api.placeOrder(cafePayload)
+          cafeOrderId = res.order_id
+        }
+
+        if (cafeOrderId && selectedReward && profile?.customer.id && rewardDiscount > 0) {
+          try {
+            await api.redeemReward({
+              customerId: profile.customer.id,
+              rewardId: selectedReward.id,
+              orderId: cafeOrderId,
+              amountToRedeem: rewardDiscount,
+            })
+          } catch (redeemErr) {
+            const msg = redeemErr instanceof Error ? redeemErr.message : 'Reward could not be applied'
+            toast.error(`Order placed but reward failed: ${msg}`)
+          }
+        }
         clearCafeCart()
         clearShopCart()
       } catch {
         // Shop already paid; keep cafe cart for retry.
         clearShopCart()
-        setBanner('Shop paid. Cafe order failed — retry from Orders.')
+        setBanner(paymentType === 'COD'
+          ? 'Shop paid. Cafe order failed — retry from Orders.'
+          : 'Shop paid. Cafe payment failed — retry from Orders.')
       }
 
       qc.invalidateQueries({ queryKey: ['customer-orders'] })
 
-      const ids = [shopOrderId, cafeOrderId].filter(Boolean).join(',')
-      navigate(`/orders?active=${ids}`)
+      const UUID_RE = /^[0-9a-f-]{36}$/
+      const isValidId = (id: string | null | undefined): id is string => !!id && UUID_RE.test(id)
+      if (isValidId(cafeOrderId) && isValidId(shopOrderId)) {
+        // Cafe is the primary for the confirmation page; shop is secondary chip
+        navigate(`/order-confirmation/${cafeOrderId}?secondary=${shopOrderId}`)
+      } else if (isValidId(cafeOrderId)) {
+        navigate(`/order-confirmation/${cafeOrderId}`)
+      } else if (isValidId(shopOrderId)) {
+        navigate(`/order-confirmation/${shopOrderId}`)
+      } else {
+        console.error('checkout: no valid order IDs to navigate to', { shopOrderId, cafeOrderId })
+        navigate('/orders')
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Payment failed'
       setBanner(msg)
@@ -268,7 +350,7 @@ export function UnifiedCheckoutScreen() {
         )}
 
         {/* Ship section */}
-        <section className="bg-white rounded-lg border border-[var(--card)] p-3 space-y-3">
+        <section id="checkout-address-section" className="bg-white rounded-lg border border-[var(--card)] p-3 space-y-3">
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">📦 Ship</span>
             <h2 className="text-sm font-semibold text-[var(--text)]">Shipped items</h2>
@@ -387,7 +469,7 @@ export function UnifiedCheckoutScreen() {
         </section>
 
         {/* Pickup section */}
-        <section className="bg-white rounded-lg border border-[var(--card)] p-3 space-y-3">
+        <section id="checkout-pickup-section" className="bg-white rounded-lg border border-[var(--card)] p-3 space-y-3">
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">🥤 Pickup</span>
             <h2 className="text-sm font-semibold text-[var(--text)]">Pickup items</h2>
@@ -419,7 +501,22 @@ export function UnifiedCheckoutScreen() {
             <div className="flex justify-between text-sm text-[var(--text-secondary)]">
               <span>Tax & Service (18%)</span><span>₹{taxEstimate}</span>
             </div>
+            {rewardDiscount > 0 && (
+              <div className="flex justify-between text-sm" style={{ color: '#6B8E23' }}>
+                <span>{selectedReward?.name ?? 'Reward'}</span>
+                <span>−₹{rewardDiscount.toFixed(0)}</span>
+              </div>
+            )}
           </div>
+
+          {profile?.customer.id && (
+            <RewardPicker
+              customerId={profile.customer.id}
+              orderAmount={cafeTotal}
+              selectedRewardId={selectedReward?.id ?? null}
+              onSelect={setSelectedReward}
+            />
+          )}
 
           <div className="border-t border-[var(--card)] pt-2">
             <label className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wide block mb-1.5">Payment</label>
@@ -446,7 +543,7 @@ export function UnifiedCheckoutScreen() {
         {/* Totals */}
         <section className="bg-white rounded-lg border border-[var(--card)] p-3 space-y-1 text-sm">
           <div className="flex justify-between text-[var(--text-secondary)]">
-            <span>Pickup total</span><span>₹{cafeTotal.toFixed(0)}</span>
+            <span>Pickup total</span><span>₹{payableCafeTotal.toFixed(0)}</span>
           </div>
           <div className="flex justify-between text-[var(--text-secondary)]">
             <span>Shipped subtotal</span><span>₹{shopSubtotal.toFixed(0)}</span>
@@ -465,11 +562,29 @@ export function UnifiedCheckoutScreen() {
       </div>
 
       <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-white border-t border-[var(--card)] px-4 py-3">
+        {hasMissing && !loading && (
+          <div
+            id="checkout-hint"
+            role="status"
+            aria-live="polite"
+            className="mb-2 px-3 py-2 rounded-lg text-xs flex items-start gap-2"
+            style={{ backgroundColor: 'var(--muted)', color: 'var(--text-secondary)' }}
+          >
+            <span aria-hidden="true">⚠️</span>
+            <span>
+              {missingFields.length === 1
+                ? missingFields[0].label
+                : `To continue: ${missingFields.map(f => f.label).join(' · ')}`}
+            </span>
+          </div>
+        )}
         <button
-          onClick={handlePay}
-          disabled={loading || !isStoreOpen || !selectedAddressId}
+          onClick={handleCtaClick}
+          disabled={loading}
+          aria-disabled={hasMissing}
+          aria-describedby={hasMissing ? 'checkout-hint' : undefined}
           className="w-full py-3 rounded-lg text-white font-semibold disabled:opacity-50"
-          style={{ backgroundColor: 'var(--primary)' }}
+          style={{ backgroundColor: 'var(--primary)', opacity: hasMissing && !loading ? 0.5 : undefined }}
         >
           {loading
             ? <span className="flex items-center justify-center gap-2">

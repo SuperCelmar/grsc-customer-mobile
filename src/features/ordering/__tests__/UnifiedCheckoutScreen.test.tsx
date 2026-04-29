@@ -21,12 +21,14 @@ vi.mock('@tanstack/react-query', () => ({
 const mockCreateOnlineOrder = vi.fn()
 const mockVerifyRazorpayPayment = vi.fn()
 const mockPlaceOrder = vi.fn()
+const mockCreateCashfreeCafeOrder = vi.fn()
 
 vi.mock('../../../lib/api', () => ({
   api: {
     createOnlineOrder: (...args: any[]) => mockCreateOnlineOrder(...args),
     verifyRazorpayPayment: (...args: any[]) => mockVerifyRazorpayPayment(...args),
     placeOrder: (...args: any[]) => mockPlaceOrder(...args),
+    createCashfreeCafeOrder: (...args: any[]) => mockCreateCashfreeCafeOrder(...args),
     listAddresses: vi.fn(),
   },
 }))
@@ -35,6 +37,12 @@ vi.mock('../../../lib/api', () => ({
 const mockRazorpayOpen = vi.fn()
 vi.mock('../useRazorpay', () => ({
   useRazorpay: () => ({ open: mockRazorpayOpen, loading: false, error: null }),
+}))
+
+// ── useCashfree ───────────────────────────────────────────────────────────────
+const mockCashfreeOpen = vi.fn()
+vi.mock('../useCashfree', () => ({
+  useCashfree: () => ({ open: mockCashfreeOpen, loading: false, error: null }),
 }))
 
 // ── Customer profile / store status (factory — lets tests override storeOpen) ─
@@ -127,7 +135,7 @@ vi.mock('../../../contexts/CartContext', () => ({
 
 // ── Test helpers ─────────────────────────────────────────────────────────────
 
-function setupRazorpaySuccess(shopOrderId = 'shop-order-1') {
+function setupRazorpaySuccess(shopOrderId = '11111111-1111-1111-1111-111111111111') {
   mockCreateOnlineOrder.mockResolvedValue({
     razorpay_key_id: 'rzp_test_key',
     razorpay_order_id: 'rzp_order_1',
@@ -167,9 +175,16 @@ beforeEach(() => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe('UnifiedCheckoutScreen — happy path', () => {
-  it('clears both carts and navigates with both order IDs on full success', async () => {
-    setupRazorpaySuccess('shop-order-1')
-    mockPlaceOrder.mockResolvedValue({ order_id: 'cafe-order-1' })
+  it('clears both carts and navigates with both order IDs on full success (ONLINE cafe via Cashfree)', async () => {
+    setupRazorpaySuccess('11111111-1111-1111-1111-111111111111')
+    // ONLINE cafe portion goes through Cashfree, not external-order.
+    mockCreateCashfreeCafeOrder.mockResolvedValue({
+      order_id: '22222222-2222-2222-2222-222222222222',
+      payment_session_id: 'cf_sess_mock',
+    })
+    mockCashfreeOpen.mockImplementation(async (opts: any) => {
+      opts.onSuccess('22222222-2222-2222-2222-222222222222')
+    })
 
     renderScreen()
 
@@ -181,15 +196,19 @@ describe('UnifiedCheckoutScreen — happy path', () => {
     })
 
     expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ['customer-orders'] })
-    expect(mockNavigate).toHaveBeenCalledWith('/orders?active=shop-order-1,cafe-order-1')
+    // Cafe (22222...) is primary; shop (11111...) is secondary chip
+    expect(mockNavigate).toHaveBeenCalledWith(
+      '/order-confirmation/22222222-2222-2222-2222-222222222222?secondary=11111111-1111-1111-1111-111111111111'
+    )
   })
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe('UnifiedCheckoutScreen — partial failure', () => {
-  it('clears shop cart, preserves cafe cart, shows banner with shop id, navigates with shop id only', async () => {
-    setupRazorpaySuccess('shop-order-1')
-    mockPlaceOrder.mockRejectedValue(new Error('Cafe order failed'))
+  it('clears shop cart, preserves cafe cart, shows banner with shop id, navigates with shop id only (cafe payment failure)', async () => {
+    setupRazorpaySuccess('11111111-1111-1111-1111-111111111111')
+    // Shop paid; cafe Cashfree session creation fails.
+    mockCreateCashfreeCafeOrder.mockRejectedValue(new Error('Cafe payment failed'))
 
     renderScreen()
 
@@ -201,9 +220,10 @@ describe('UnifiedCheckoutScreen — partial failure', () => {
 
     expect(mockClearCafeCart).not.toHaveBeenCalled()
 
-    expect(await screen.findByText(/Shop paid.*Cafe order failed/i)).toBeInTheDocument()
+    expect(await screen.findByText(/Shop paid.*Cafe payment failed/i)).toBeInTheDocument()
 
-    expect(mockNavigate).toHaveBeenCalledWith('/orders?active=shop-order-1')
+    // Shop-only success navigates to confirmation with shop id as primary
+    expect(mockNavigate).toHaveBeenCalledWith('/order-confirmation/11111111-1111-1111-1111-111111111111')
   })
 })
 
@@ -236,7 +256,7 @@ describe('UnifiedCheckoutScreen — Razorpay cancel', () => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe('UnifiedCheckoutScreen — store closed', () => {
-  it('renders closed-store banner and Pay button is disabled', () => {
+  it('renders closed-store banner and Pay button is aria-disabled with missing-field hint', () => {
     mockStoreOpen = false
 
     renderScreen()
@@ -246,6 +266,9 @@ describe('UnifiedCheckoutScreen — store closed', () => {
     ).toBeInTheDocument()
 
     const payBtn = screen.getByRole('button', { name: /Pay/i })
-    expect(payBtn).toBeDisabled()
+    expect(payBtn).toHaveAttribute('aria-disabled', 'true')
+    expect(
+      screen.getByText(/Cafe is closed — remove cafe items/i)
+    ).toBeInTheDocument()
   })
 })

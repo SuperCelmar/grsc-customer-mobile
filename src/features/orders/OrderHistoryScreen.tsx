@@ -1,13 +1,16 @@
 import { useState } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { Package, Utensils, Truck } from 'lucide-react'
+import { toast } from 'sonner'
 import { ScreenHeader } from '../../components/ScreenHeader'
-import { useCustomerOrders } from '../../hooks/useCustomerProfile'
+import { useCustomerOrders, useCustomerProfile } from '../../hooks/useCustomerProfile'
 import { ActiveOrderTracker } from './ActiveOrderTracker'
 import { OrderDetailSheet } from './OrderDetailSheet'
 import { QuickReorderRow } from '../reorder/QuickReorderRow'
 import { useReorder } from './useReorder'
 import type { CustomerOrders } from '../../lib/api'
+import { useCashfree } from '../ordering/useCashfree'
+import { clearSessionByOrderId, loadSessionByOrderId } from '../ordering/useCashfreeSession'
 
 type Order = CustomerOrders['orders'][number]
 
@@ -94,7 +97,7 @@ function OrderTypeBadge({ type }: { type: string }) {
 }
 
 function PastOrderCard({ order, onOpen }: { order: Order; onOpen: () => void }) {
-  const { reorder, canReorder } = useReorder()
+  const { reorder, canReorder } = useReorder(order)
   const date = new Date(order.order_date).toLocaleDateString('en-IN', {
     day: 'numeric', month: 'short',
   })
@@ -145,24 +148,46 @@ function PastOrderCard({ order, onOpen }: { order: Order; onOpen: () => void }) 
 export function OrderHistoryScreen() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const { open: openCashfree } = useCashfree()
 
   const [page, setPage] = useState(1)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const { data, isLoading, error } = useCustomerOrders(page)
+  const { data: profile } = useCustomerProfile()
 
   const orders = data?.orders || []
   const activeOrders = orders.filter(o => ACTIVE_STATUSES.has(normalizeStatus(o.status)))
   const pastOrders = orders.filter(o => !ACTIVE_STATUSES.has(normalizeStatus(o.status)))
 
+  const UUID_RE = /^[0-9a-f-]{36}$/
   const activeParam = searchParams.get('active')
   const activeOrderIds = activeParam
-    ? activeParam.split(',').map(id => id.trim()).filter(Boolean)
+    ? activeParam.split(',').map(id => id.trim()).filter(id => UUID_RE.test(id))
     : []
 
   const hasActiveSection = activeOrderIds.length > 0 || activeOrders.length > 0
-  const cashbackBalance = orders
-    .filter(o => DONE_STATUSES.has(normalizeStatus(o.status)))
-    .reduce((sum, o) => sum + (o.cashback_earned || 0), 0)
+  // Wallet is the source of truth for current cashback balance — summing
+  // cashback_earned across orders ignores redemptions and undercount lifetimes.
+  const cashbackBalance = profile?.wallet.cashback_balance ?? 0
+
+  async function handleResumePayment(orderId: string) {
+    const session = loadSessionByOrderId(orderId)
+    if (!session) {
+      toast.error('Payment session expired — please place the order again.')
+      return
+    }
+    await openCashfree({
+      payment_session_id: session.payment_session_id,
+      order_id: session.order_id,
+      onSuccess: (paidOrderId) => {
+        clearSessionByOrderId(paidOrderId)
+        navigate(`/order-confirmation/${paidOrderId}`)
+      },
+      onFailure: (msg) => {
+        toast.error(msg || 'Payment could not be completed')
+      },
+    })
+  }
 
   return (
     <div className="flex flex-col min-h-screen pb-20">
@@ -228,7 +253,7 @@ export function OrderHistoryScreen() {
                     <span className="text-xs text-[#6B6560]">Active</span>
                   </div>
                   <div className="px-3 pb-3">
-                    <ActiveOrderTracker orderId={id} />
+                    <ActiveOrderTracker orderId={id} onResumePayment={handleResumePayment} />
                   </div>
                 </div>
               ))}
@@ -257,7 +282,7 @@ export function OrderHistoryScreen() {
                       )}
                     </div>
                     <div className="px-3 pb-3">
-                      <ActiveOrderTracker orderId={order.id} />
+                      <ActiveOrderTracker orderId={order.id} onResumePayment={handleResumePayment} />
                     </div>
                   </div>
                 )

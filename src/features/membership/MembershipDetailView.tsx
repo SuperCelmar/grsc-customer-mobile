@@ -51,9 +51,10 @@ type MembershipDetailViewProps = {
   membership: NonNullable<CustomerProfile['membership']>
   onUpgrade?: () => void
   embedded?: boolean
+  firstName?: string | null
 }
 
-export function MembershipDetailView({ membership, onUpgrade, embedded = false }: MembershipDetailViewProps) {
+export function MembershipDetailView({ membership, onUpgrade, embedded = false, firstName }: MembershipDetailViewProps) {
   const tier = (membership.tier as TierKey) ?? 'pro'
   const config = TIER_CONFIG[tier] ?? TIER_CONFIG.pro
   const { color, label, cashback: cashbackRate, freeCoffees: maxCoffees, haloShadow } = config
@@ -84,6 +85,14 @@ export function MembershipDetailView({ membership, onUpgrade, embedded = false }
         <div className="px-4 pt-10 pb-4">
           <h1 className="font-serif text-2xl font-bold text-[#1A1410]">Membership</h1>
         </div>
+      )}
+
+      {embedded && (
+        <p className="px-4 pt-3 pb-1 text-sm text-[#6B6560]">
+          {firstName
+            ? <>Hi, <span className="font-semibold text-[#1A1410]">{firstName}</span></>
+            : 'Welcome back'}
+        </p>
       )}
 
       {isExpired && (
