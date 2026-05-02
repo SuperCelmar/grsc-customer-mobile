@@ -9,7 +9,7 @@ import type { CustomerOrders, ReorderPayload } from '../../lib/api'
 type Order = CustomerOrders['orders'][number]
 
 const isReorderable = (o: Order): boolean =>
-  ['delivered', 'completed', 'done'].includes(o.status.toLowerCase()) && !!o.reorder_payload
+  ['delivered', 'completed', 'done'].includes(o.status?.toLowerCase() ?? '') && !!o.reorder_payload
 
 export function useReorder(targetOrder?: Order) {
   const { data, isLoading } = useCustomerOrders(1)

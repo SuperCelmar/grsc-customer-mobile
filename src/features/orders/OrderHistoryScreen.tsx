@@ -36,8 +36,8 @@ const ACTIVE_STATUSES = new Set([
 
 const DONE_STATUSES = new Set(['delivered', 'completed', 'done'])
 
-function normalizeStatus(status: string): string {
-  return status.toLowerCase().replace(/\s+/g, '_')
+function normalizeStatus(status: string | null | undefined): string {
+  return (status ?? '').toLowerCase().replace(/\s+/g, '_')
 }
 
 function activeStatusSubline(status: string): string | null {
@@ -86,8 +86,8 @@ const ORDER_TYPE_ICONS: Record<string, React.ReactElement> = {
   delivery: <Truck size={14} />,
 }
 
-function OrderTypeBadge({ type }: { type: string }) {
-  const icon = ORDER_TYPE_ICONS[type.toLowerCase()] ?? <Package size={14} />
+function OrderTypeBadge({ type }: { type: string | null | undefined }) {
+  const icon = ORDER_TYPE_ICONS[(type ?? '').toLowerCase()] ?? <Package size={14} />
   return (
     <span className="inline-flex items-center gap-1 text-[12px]" style={{ color: '#1A1410' }}>
       {icon}
