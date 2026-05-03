@@ -19,5 +19,16 @@ export default defineConfig([
       ecmaVersion: 2020,
       globals: globals.browser,
     },
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "CallExpression[callee.type='MemberExpression'][callee.property.name='schema'][arguments.0.type='Literal'][arguments.0.value!='location'][arguments.0.value!='public']",
+          message:
+            "Customer app may only call .schema('location') or .schema('public'). Other schemas are sealed — use an edge function instead. See docs/BOUNDARY-RULE.md for the boundary rule.",
+        },
+      ],
+    },
   },
 ])
