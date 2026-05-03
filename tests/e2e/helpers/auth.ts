@@ -1,8 +1,9 @@
 import type { Page } from '@playwright/test'
 
-const SUPABASE_URL = 'https://hotymmwjdqnztegxgttb.supabase.co'
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL ?? 'https://YOUR_PROJECT_REF.supabase.co'
 // Supabase JS v2 stores session under this key in localStorage
-const SUPABASE_SESSION_KEY = 'sb-hotymmwjdqnztegxgttb-auth-token'
+const SUPABASE_PROJECT_REF = new URL(SUPABASE_URL).host.split('.')[0]
+const SUPABASE_SESSION_KEY = `sb-${SUPABASE_PROJECT_REF}-auth-token`
 
 /**
  * A fake Supabase session that satisfies AuthContext's `session !== null` check.
