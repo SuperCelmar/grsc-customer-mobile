@@ -1,20 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
-const mockMaybeSingle = vi.fn()
+const mockInvoke = vi.fn()
 
 vi.mock('../../../lib/supabase', () => {
-  const chain = {
-    select: vi.fn().mockReturnThis(),
-    eq: vi.fn().mockReturnThis(),
-    order: vi.fn().mockReturnThis(),
-    maybeSingle: (...args: unknown[]) => mockMaybeSingle(...args),
-  }
-  chain.select.mockReturnValue(chain)
-  chain.eq.mockReturnValue(chain)
-  chain.order.mockReturnValue(chain)
   return {
     supabase: {
-      from: vi.fn(() => chain),
+      functions: {
+        invoke: (...args: unknown[]) => mockInvoke(...args),
+      },
     },
   }
 })
@@ -28,6 +21,8 @@ const ORDER_ROW = {
   order_fulfillment_events: [],
 }
 
+const NOT_FOUND_ERROR = { context: { status: 404 } }
+
 beforeEach(() => {
   vi.useFakeTimers()
   vi.clearAllMocks()
@@ -39,46 +34,68 @@ afterEach(() => {
 
 describe('fetchOrderWithRetry', () => {
   it('returns data immediately on first successful fetch', async () => {
-    mockMaybeSingle.mockResolvedValue({ data: ORDER_ROW, error: null })
+    mockInvoke.mockResolvedValue({ data: ORDER_ROW, error: null })
     const promise = fetchOrderWithRetry('some-uuid')
     await vi.runAllTimersAsync()
     const result = await promise
     expect(result).toEqual(ORDER_ROW)
-    expect(mockMaybeSingle).toHaveBeenCalledTimes(1)
+    expect(mockInvoke).toHaveBeenCalledTimes(1)
   })
 
-  it('retries after null and returns data on second attempt', async () => {
-    mockMaybeSingle
-      .mockResolvedValueOnce({ data: null, error: null })
+  it('retries after 404 and returns data on second attempt', async () => {
+    mockInvoke
+      .mockResolvedValueOnce({ data: null, error: NOT_FOUND_ERROR })
       .mockResolvedValueOnce({ data: ORDER_ROW, error: null })
 
     const promise = fetchOrderWithRetry('some-uuid')
     await vi.runAllTimersAsync()
     const result = await promise
     expect(result).toEqual(ORDER_ROW)
-    expect(mockMaybeSingle).toHaveBeenCalledTimes(2)
+    expect(mockInvoke).toHaveBeenCalledTimes(2)
   })
 
-  it('retries after two nulls and returns data on third attempt', async () => {
-    mockMaybeSingle
-      .mockResolvedValueOnce({ data: null, error: null })
-      .mockResolvedValueOnce({ data: null, error: null })
+  it('retries after two 404s and returns data on third attempt', async () => {
+    mockInvoke
+      .mockResolvedValueOnce({ data: null, error: NOT_FOUND_ERROR })
+      .mockResolvedValueOnce({ data: null, error: NOT_FOUND_ERROR })
       .mockResolvedValueOnce({ data: ORDER_ROW, error: null })
 
     const promise = fetchOrderWithRetry('some-uuid')
     await vi.runAllTimersAsync()
     const result = await promise
     expect(result).toEqual(ORDER_ROW)
-    expect(mockMaybeSingle).toHaveBeenCalledTimes(3)
+    expect(mockInvoke).toHaveBeenCalledTimes(3)
   })
 
-  it('returns null after all 4 attempts return null', async () => {
-    mockMaybeSingle.mockResolvedValue({ data: null, error: null })
+  it('returns null after all 4 attempts return 404', async () => {
+    mockInvoke.mockResolvedValue({ data: null, error: NOT_FOUND_ERROR })
 
     const promise = fetchOrderWithRetry('some-uuid')
     await vi.runAllTimersAsync()
     const result = await promise
     expect(result).toBeNull()
-    expect(mockMaybeSingle).toHaveBeenCalledTimes(4)
+    expect(mockInvoke).toHaveBeenCalledTimes(4)
+  })
+
+  it('returns null immediately on non-404 error (terminal)', async () => {
+    mockInvoke.mockResolvedValue({ data: null, error: { context: { status: 500 } } })
+
+    const promise = fetchOrderWithRetry('some-uuid')
+    await vi.runAllTimersAsync()
+    const result = await promise
+    expect(result).toBeNull()
+    expect(mockInvoke).toHaveBeenCalledTimes(1)
+  })
+
+  it('retries on null data with no error (safety case)', async () => {
+    mockInvoke
+      .mockResolvedValueOnce({ data: null, error: null })
+      .mockResolvedValueOnce({ data: ORDER_ROW, error: null })
+
+    const promise = fetchOrderWithRetry('some-uuid')
+    await vi.runAllTimersAsync()
+    const result = await promise
+    expect(result).toEqual(ORDER_ROW)
+    expect(mockInvoke).toHaveBeenCalledTimes(2)
   })
 })
