@@ -70,6 +70,11 @@ export type CustomerProfile = {
     phone: string
     email: string | null
     created_at: string
+    address_line1: string | null
+    address_line2: string | null
+    city: string | null
+    state: string | null
+    zip_code: string | null
   }
   membership: {
     membership_id: string
@@ -212,7 +217,10 @@ export type PlaceOrderResponse = {
 
 export type OnlineOrderRequest = {
   items: Array<{ variant_id: string; quantity: number }>
-  shipping_address_id: string
+  // Field still sent for backend compatibility (Step 1 check 6 — backend
+  // confirmation pending). Sourced from customer.customers.address_* via
+  // customer-profile GET; null if profile has no address.
+  shipping_address_id: string | null
   applied_reward_id?: string
 }
 
@@ -235,19 +243,6 @@ export type VerifyPaymentRequest = {
   razorpay_order_id: string
   razorpay_payment_id: string
   razorpay_signature: string
-}
-
-export type CustomerAddress = {
-  address_id: string
-  customer_id: string
-  label: string | null
-  line1: string
-  line2: string | null
-  city: string
-  state: string
-  pincode: string
-  is_default: boolean
-  created_at: string
 }
 
 export type LoyaltyReward = {
@@ -344,30 +339,4 @@ export const api = {
 
   manageSubscription: (id: string, action: 'pause' | 'resume' | 'cancel', reason?: string) =>
     callFunction<{ success: boolean }>('subscription-manage', { id, action, ...(reason ? { reason } : {}) }),
-
-  // Addresses (direct table access via RLS)
-  listAddresses: async (): Promise<CustomerAddress[]> => {
-    const { data, error } = await supabase
-      .from('customer_addresses')
-      .select('*')
-      .order('is_default', { ascending: false })
-      .order('created_at', { ascending: false })
-    if (error) throw new Error(error.message)
-    return (data as CustomerAddress[]) || []
-  },
-
-  createAddress: async (address: Omit<CustomerAddress, 'address_id' | 'customer_id' | 'created_at'>): Promise<CustomerAddress> => {
-    const { data, error } = await supabase
-      .from('customer_addresses')
-      .insert(address)
-      .select()
-      .single()
-    if (error) throw new Error(error.message)
-    return data as CustomerAddress
-  },
-
-  deleteAddress: async (address_id: string): Promise<void> => {
-    const { error } = await supabase.from('customer_addresses').delete().eq('address_id', address_id)
-    if (error) throw new Error(error.message)
-  },
 }
