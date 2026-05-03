@@ -13,7 +13,6 @@ vi.mock('react-router-dom', () => ({
 // ── React Query ──────────────────────────────────────────────────────────────
 const mockInvalidateQueries = vi.fn()
 vi.mock('@tanstack/react-query', () => ({
-  useQuery: () => ({ data: [mockAddress], isLoading: false }),
   useQueryClient: () => ({ invalidateQueries: mockInvalidateQueries }),
 }))
 
@@ -29,7 +28,6 @@ vi.mock('../../../lib/api', () => ({
     verifyRazorpayPayment: (...args: any[]) => mockVerifyRazorpayPayment(...args),
     placeOrder: (...args: any[]) => mockPlaceOrder(...args),
     createCashfreeCafeOrder: (...args: any[]) => mockCreateCashfreeCafeOrder(...args),
-    listAddresses: vi.fn(),
   },
 }))
 
@@ -47,13 +45,26 @@ vi.mock('../useCashfree', () => ({
 
 // ── Customer profile / store status (factory — lets tests override storeOpen) ─
 let mockStoreOpen = true
+let mockProfileAddressLine1: string | null = '123 Main St'
 vi.mock('../../../hooks/useCustomerProfile', () => ({
   useCustomerProfile: () => ({
-    data: { customer: { phone: '9999999999', name: 'Test User' } },
+    data: {
+      customer: {
+        id: 'cust-1',
+        phone: '9999999999',
+        name: 'Test User',
+        address_line1: mockProfileAddressLine1,
+        address_line2: null,
+        city: 'Hyderabad',
+        state: 'Telangana',
+        zip_code: '500001',
+      },
+    },
   }),
   useStoreStatus: () => ({
     data: { store_status: mockStoreOpen ? '1' : '0' },
   }),
+  useAvailableRewards: () => ({ data: { rewards: [] }, isLoading: false }),
 }))
 
 // ── OrderingContext ──────────────────────────────────────────────────────────
@@ -67,11 +78,6 @@ vi.mock('../OrderingContext', () => ({
   }),
 }))
 
-// ── AddressBottomSheet (not under test) ──────────────────────────────────────
-vi.mock('../AddressBottomSheet', () => ({
-  AddressBottomSheet: () => null,
-}))
-
 // ── lucide-react ─────────────────────────────────────────────────────────────
 vi.mock('lucide-react', () => ({
   ArrowLeft: () => <span>Back</span>,
@@ -81,17 +87,6 @@ vi.mock('lucide-react', () => ({
 }))
 
 // ── Shared fixtures ──────────────────────────────────────────────────────────
-const mockAddress = {
-  address_id: 'addr-1',
-  label: 'Home',
-  line1: '123 Main St',
-  line2: '',
-  city: 'Hyderabad',
-  state: 'Telangana',
-  pincode: '500001',
-  is_default: true,
-}
-
 const cafeItem: CafeCartItem = {
   cartItemId: 'ci-1',
   productId: 'p-1',
@@ -161,6 +156,7 @@ function renderScreen() {
 beforeEach(() => {
   vi.clearAllMocks()
   mockStoreOpen = true
+  mockProfileAddressLine1 = '123 Main St'
   mockCartState = {
     items: [cafeItem],
     cafeCount: 1,
@@ -251,6 +247,19 @@ describe('UnifiedCheckoutScreen — Razorpay cancel', () => {
     expect(mockClearCafeCart).not.toHaveBeenCalled()
     expect(mockClearShopCart).not.toHaveBeenCalled()
     expect(mockNavigate).not.toHaveBeenCalled()
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe('UnifiedCheckoutScreen — no profile address', () => {
+  it('shows empty-state copy and disables Pay when profile has no address_line1', () => {
+    mockProfileAddressLine1 = null
+
+    renderScreen()
+
+    expect(screen.getByText(/No address on file/i)).toBeInTheDocument()
+    const payBtn = screen.getByRole('button', { name: /Pay/i })
+    expect(payBtn).toHaveAttribute('aria-disabled', 'true')
   })
 })
 
