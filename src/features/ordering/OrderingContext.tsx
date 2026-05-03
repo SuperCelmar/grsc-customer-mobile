@@ -22,7 +22,9 @@ export function OrderingProvider({ children }: { children: ReactNode }) {
   const [storeLoading, setStoreLoading] = useState(true)
 
   useEffect(() => {
+    // TODO(multischema-adapt): requires `location` schema in PostgREST exposed_schemas + SELECT RLS on location.stores. Confirm with backend before merging this branch.
     supabase
+      .schema('location')
       .from('stores')
       .select('store_id, store_name, city, petpooja_restaurant_id')
       .eq('store_name', TARGET_STORE_NAME)
