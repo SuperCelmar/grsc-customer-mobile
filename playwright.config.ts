@@ -24,7 +24,7 @@ export default defineConfig({
     reuseExistingServer: true,
     timeout: 30_000,
     env: {
-      VITE_SUPABASE_URL: 'https://hotymmwjdqnztegxgttb.supabase.co',
+      VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL ?? 'https://YOUR_PROJECT_REF.supabase.co',
       VITE_SUPABASE_ANON_KEY: 'sb_publishable_AJemA3U5n1ppf5Z4-z_qkQ_kcwOwVj9',
       VITE_TEST_PHONE: '9999999999',
       VITE_TEST_OTP: '123456',
