@@ -8,6 +8,7 @@ import { ShopCheckoutScreen } from './features/ordering/ShopCheckoutScreen'
 import { UnifiedCheckoutScreen } from './features/ordering/UnifiedCheckoutScreen'
 import { OrderConfirmationScreen } from './features/ordering/OrderConfirmationScreen'
 import { OrderHistoryScreen } from './features/orders/OrderHistoryScreen'
+import { SubscriptionsScreen } from './features/subscriptions/SubscriptionsScreen'
 import { ComingSoonScreen } from './features/account/ComingSoonScreen'
 import { ProtectedLayout } from './components/ProtectedLayout'
 import { AppShell } from './components/AppShell'
@@ -28,6 +29,7 @@ export default function App() {
             <Route path="/checkout" element={<TierGuard require="active-member" fallback="/dashboard"><UnifiedCheckoutScreen /></TierGuard>} />
             <Route path="/checkout/shop" element={<TierGuard require="active-member" fallback="/dashboard"><ShopCheckoutScreen /></TierGuard>} />
             <Route path="/orders" element={<OrderHistoryScreen />} />
+            <Route path="/subscriptions" element={<SubscriptionsScreen />} />
             <Route path="/order-confirmation/:orderId" element={<OrderConfirmationScreen />} />
             <Route path="/account/notifications" element={<ComingSoonScreen title="Notifications" />} />
           </Route>

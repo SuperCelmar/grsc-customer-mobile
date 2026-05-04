@@ -9,6 +9,7 @@ export type CafeCartItem = {
   productCode: string
   name: string
   price: number
+  imageUrl?: string | null
   quantity: number
   addons: AddonSelection[]
   specialInstructions: string

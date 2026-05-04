@@ -27,11 +27,12 @@ function renderAt(path: string) {
 }
 
 describe('BottomNav', () => {
-  it('renders 4 tabs with correct labels', () => {
+  it('renders 5 tabs with correct labels', () => {
     renderAt('/dashboard')
     expect(screen.getByText('Home')).toBeInTheDocument()
     expect(screen.getByText('Shop')).toBeInTheDocument()
     expect(screen.getByText('Reorder')).toBeInTheDocument()
+    expect(screen.getByText('Subs')).toBeInTheDocument()
     expect(screen.getByText('Account')).toBeInTheDocument()
   })
 
@@ -42,6 +43,7 @@ describe('BottomNav', () => {
     expect(buttons[1]).not.toHaveAttribute('aria-current')
     expect(buttons[2]).not.toHaveAttribute('aria-current')
     expect(buttons[3]).not.toHaveAttribute('aria-current')
+    expect(buttons[4]).not.toHaveAttribute('aria-current')
   })
 
   it('marks Shop active on /order', () => {
@@ -51,6 +53,7 @@ describe('BottomNav', () => {
     expect(buttons[1]).toHaveAttribute('aria-current', 'page')
     expect(buttons[2]).not.toHaveAttribute('aria-current')
     expect(buttons[3]).not.toHaveAttribute('aria-current')
+    expect(buttons[4]).not.toHaveAttribute('aria-current')
   })
 
   it('marks Reorder active on /orders', () => {
@@ -60,6 +63,17 @@ describe('BottomNav', () => {
     expect(buttons[1]).not.toHaveAttribute('aria-current')
     expect(buttons[2]).toHaveAttribute('aria-current', 'page')
     expect(buttons[3]).not.toHaveAttribute('aria-current')
+    expect(buttons[4]).not.toHaveAttribute('aria-current')
+  })
+
+  it('marks Subs active on /subscriptions', () => {
+    renderAt('/subscriptions')
+    const buttons = screen.getAllByRole('button')
+    expect(buttons[0]).not.toHaveAttribute('aria-current')
+    expect(buttons[1]).not.toHaveAttribute('aria-current')
+    expect(buttons[2]).not.toHaveAttribute('aria-current')
+    expect(buttons[3]).toHaveAttribute('aria-current', 'page')
+    expect(buttons[4]).not.toHaveAttribute('aria-current')
   })
 
   it('marks Account active on /membership', () => {
@@ -68,7 +82,8 @@ describe('BottomNav', () => {
     expect(buttons[0]).not.toHaveAttribute('aria-current')
     expect(buttons[1]).not.toHaveAttribute('aria-current')
     expect(buttons[2]).not.toHaveAttribute('aria-current')
-    expect(buttons[3]).toHaveAttribute('aria-current', 'page')
+    expect(buttons[3]).not.toHaveAttribute('aria-current')
+    expect(buttons[4]).toHaveAttribute('aria-current', 'page')
   })
 
   it('clicking Account tab makes it active', async () => {

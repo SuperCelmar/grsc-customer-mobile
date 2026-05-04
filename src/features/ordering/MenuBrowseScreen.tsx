@@ -308,6 +308,7 @@ function MenuBrowseInner() {
       productCode: product.id,
       name: product.name,
       price: product.price,
+      imageUrl: product.image_url ?? null,
       quantity: 1,
       addons: [],
       specialInstructions: '',

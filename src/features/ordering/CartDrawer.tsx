@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
+import { ProductImage } from '../../components/ProductImage'
 import { useCart } from '../../contexts/CartContext'
 import type { CartSubscription } from '../../contexts/CartContext'
 import { useCustomerProfile } from '../../hooks/useCustomerProfile'
 import { api } from '../../lib/api'
 import type { LoyaltyReward, PlaceOrderRequest } from '../../lib/api'
 import { RewardPicker } from '../orders/RewardPicker'
+import { OrderProcessingOverlay } from './OrderProcessingOverlay'
 import { useCashfree } from './useCashfree'
 import { cartHash, clearSessionByOrderId, loadSession, saveSession } from './useCashfreeSession'
 
@@ -33,27 +35,6 @@ type Props = {
   storeRestId: string
   storeId: string
   isStoreOpen: boolean
-}
-
-function GRMonogram({ size = 72 }: { size?: number }) {
-  return (
-    <div
-      className="flex items-center justify-center flex-shrink-0"
-      style={{
-        width: size,
-        height: size,
-        backgroundColor: 'var(--muted)',
-        borderRadius: 6,
-        fontFamily: 'serif',
-        color: 'var(--primary)',
-        fontSize: Math.round(size * 0.4),
-        fontWeight: 600,
-        letterSpacing: 1,
-      }}
-    >
-      GR
-    </div>
-  )
 }
 
 function TypePill({ kind }: { kind: 'cafe' | 'shop' }) {
@@ -249,6 +230,7 @@ export function CartDrawer({ onClose, storeRestId, isStoreOpen }: Props) {
   const isMixed = cafeCount > 0 && shopCount > 0
   const isCafeOnly = cafeCount > 0 && shopCount === 0
   const isShopOnly = cafeCount === 0 && shopCount > 0
+  const processingIntent = paymentType === 'COD' ? 'cash-order' : 'online-payment'
 
   let ctaLabel: string
   let ctaOnClick: () => void
@@ -258,7 +240,7 @@ export function CartDrawer({ onClose, storeRestId, isStoreOpen }: Props) {
     ctaLabel = !isStoreOpen
       ? 'Store Closed'
       : loading
-        ? 'Placing Order...'
+        ? paymentType === 'COD' ? 'Sending Order...' : 'Starting Payment...'
         : `Place Order · ₹${cafeTotal.toFixed(0)}`
     ctaOnClick = handlePlaceOrder
     ctaDisabled = loading || !isStoreOpen
@@ -282,20 +264,11 @@ export function CartDrawer({ onClose, storeRestId, isStoreOpen }: Props) {
       />
       <div className="relative bg-white rounded-t-2xl max-h-[92vh] flex flex-col">
         {loading && (
-          <div
-            className="absolute inset-0 z-10 bg-white/85 backdrop-blur-sm rounded-t-2xl flex flex-col items-center justify-center px-6"
-            role="status"
-            aria-live="polite"
-          >
-            <div
-              className="animate-spin rounded-full h-10 w-10 border-[3px] border-t-transparent mb-4"
-              style={{ borderColor: 'var(--primary)', borderTopColor: 'transparent' }}
-            />
-            <p className="text-[15px] font-semibold text-[var(--text)]">Placing your order…</p>
-            <p className="text-[13px] text-[var(--text-secondary)] mt-1 text-center">
-              This usually takes a few seconds. Please don't close the app.
-            </p>
-          </div>
+          <OrderProcessingOverlay
+            intent={processingIntent}
+            totalLabel={`₹${payableCafeTotal.toFixed(0)} pickup`}
+            className="absolute inset-0 rounded-t-2xl"
+          />
         )}
         <div className="px-4 pt-4 pb-3 flex items-center justify-between border-b border-[var(--card)]">
           <h2 className="text-lg font-semibold text-[var(--text)]">Your Cart</h2>
@@ -325,7 +298,7 @@ export function CartDrawer({ onClose, storeRestId, isStoreOpen }: Props) {
                 style={{ fontSize: 18, lineHeight: 1 }}
               >×</button>
               <div className="flex items-start gap-3">
-                <GRMonogram size={72} />
+                <ProductImage src={item.imageUrl ?? null} alt={item.name} />
                 <div className="flex-1 min-w-0 pr-6">
                   <div className="mb-1"><TypePill kind="cafe" /></div>
                   <p className="text-sm font-medium text-[var(--text)]">{item.name}</p>
@@ -367,17 +340,7 @@ export function CartDrawer({ onClose, storeRestId, isStoreOpen }: Props) {
                 style={{ fontSize: 18, lineHeight: 1 }}
               >×</button>
               <div className="flex items-start gap-3">
-                {item.imageUrl ? (
-                  <img
-                    src={item.imageUrl}
-                    alt={item.productName}
-                    loading="lazy"
-                    className="flex-shrink-0 object-cover"
-                    style={{ width: 72, height: 72, borderRadius: 6 }}
-                  />
-                ) : (
-                  <GRMonogram size={72} />
-                )}
+                <ProductImage src={item.imageUrl} alt={item.productName} />
                 <div className="flex-1 min-w-0 pr-6">
                   <div className="mb-1 flex items-center gap-1.5 flex-wrap">
                     <TypePill kind="shop" />

@@ -10,6 +10,7 @@ import { api } from '../../lib/api'
 import type { LoyaltyReward, PlaceOrderRequest } from '../../lib/api'
 import { useRazorpay } from './useRazorpay'
 import { useCashfree } from './useCashfree'
+import { OrderProcessingOverlay } from './OrderProcessingOverlay'
 import { getMissingCheckoutFields } from './checkoutValidation'
 import { RewardPicker } from '../orders/RewardPicker'
 
@@ -61,6 +62,7 @@ export function UnifiedCheckoutScreen() {
   const payableCafeTotal = Math.max(0, cafeTotal - rewardDiscount)
   const shopSubtotal = shopSubtotalPaise / 100
   const grandTotal = payableCafeTotal + shopSubtotal
+  const processingIntent = paymentType === 'COD' ? 'mixed-cash' : 'mixed-online'
 
   const missingFields = getMissingCheckoutFields({
     selectedAddressId,
@@ -319,11 +321,19 @@ export function UnifiedCheckoutScreen() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--muted)] max-w-[430px] mx-auto flex flex-col">
+    <div className="relative min-h-screen bg-[var(--muted)] max-w-[430px] mx-auto flex flex-col">
       <ScreenHeader
         title="Checkout"
         onBack={handleBack}
       />
+
+      {loading && (
+        <OrderProcessingOverlay
+          intent={processingIntent}
+          totalLabel={`₹${grandTotal.toFixed(0)}+ checkout`}
+          className="absolute inset-0"
+        />
+      )}
 
       <div className={`flex-1 overflow-y-auto pb-28 px-4 py-4 space-y-4 ${loading ? 'pointer-events-none opacity-60' : ''}`}>
         {!isStoreOpen && (

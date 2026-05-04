@@ -70,6 +70,7 @@ export function ProductDetailSheet({ product, onClose, onViewCart }: Props) {
       productCode: product.id,
       name: product.name,
       price: product.price,
+      imageUrl: product.image_url ?? null,
       quantity,
       addons,
       specialInstructions,
