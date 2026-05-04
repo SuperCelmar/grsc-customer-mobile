@@ -9,6 +9,7 @@ import { UnifiedCheckoutScreen } from './features/ordering/UnifiedCheckoutScreen
 import { OrderConfirmationScreen } from './features/ordering/OrderConfirmationScreen'
 import { OrderHistoryScreen } from './features/orders/OrderHistoryScreen'
 import { SubscriptionsScreen } from './features/subscriptions/SubscriptionsScreen'
+import { CancelInterstitialScreen } from './features/subscriptions/CancelInterstitialScreen'
 import { ComingSoonScreen } from './features/account/ComingSoonScreen'
 import { ProtectedLayout } from './components/ProtectedLayout'
 import { AppShell } from './components/AppShell'
@@ -30,6 +31,7 @@ export default function App() {
             <Route path="/checkout/shop" element={<TierGuard require="active-member" fallback="/dashboard"><ShopCheckoutScreen /></TierGuard>} />
             <Route path="/orders" element={<OrderHistoryScreen />} />
             <Route path="/subscriptions" element={<SubscriptionsScreen />} />
+            <Route path="/subscriptions/cancel" element={<CancelInterstitialScreen />} />
             <Route path="/order-confirmation/:orderId" element={<OrderConfirmationScreen />} />
             <Route path="/account/notifications" element={<ComingSoonScreen title="Notifications" />} />
           </Route>
