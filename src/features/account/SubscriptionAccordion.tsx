@@ -1,6 +1,9 @@
+import { useState } from 'react'
 import { Coffee } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 import { Accordion, AccordionRow } from './Accordion'
+import { useSubscriptionActions } from '../subscriptions/useSubscription'
 import type { CustomerSubscriptions } from '../../lib/api'
 
 type Sub = CustomerSubscriptions['subscriptions'][0]
@@ -49,7 +52,24 @@ function CollapsedSummary({ subscription }: { subscription: Sub | null }) {
 }
 
 function ActiveContent({ subscription }: { subscription: Sub }) {
+  const navigate = useNavigate()
+  const actions = useSubscriptionActions()
+  const [skipLoading, setSkipLoading] = useState(false)
+
   const price = Math.round(subscription.price_snapshot / 100)
+
+  async function handleSkip() {
+    setSkipLoading(true)
+    try {
+      await actions.skipNext(subscription.id)
+      toast.success('Skipped — next delivery rescheduled.')
+    } catch {
+      toast.error('Could not skip. Please try again.')
+    } finally {
+      setSkipLoading(false)
+    }
+  }
+
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-3">
@@ -100,21 +120,30 @@ function ActiveContent({ subscription }: { subscription: Sub }) {
       <div className="flex gap-2 pt-1">
         <button
           type="button"
-          disabled
-          title="Coming soon — contact support"
-          className="flex-1 py-2 text-sm font-semibold border border-[#E8DDD0] text-[#6B6560] rounded-md opacity-50 cursor-not-allowed"
+          onClick={handleSkip}
+          disabled={skipLoading}
+          className="flex-1 py-2 text-sm font-semibold border border-[#D4A574] text-[#D4A574] rounded-md disabled:opacity-50"
         >
-          Skip next
+          {skipLoading ? 'Skipping…' : 'Skip next'}
         </button>
         <button
           type="button"
           disabled
-          title="Coming soon — contact support"
+          title="Coming in v1.1"
           className="flex-1 py-2 text-sm font-semibold border border-[#E8DDD0] text-[#6B6560] rounded-md opacity-50 cursor-not-allowed"
         >
           Pause
         </button>
       </div>
+
+      <button
+        type="button"
+        onClick={() => navigate('/subscriptions')}
+        className="w-full text-center text-xs font-medium pt-0.5"
+        style={{ color: '#D4A574' }}
+      >
+        Manage full subscription →
+      </button>
     </div>
   )
 }
@@ -123,20 +152,38 @@ function EmptyContent() {
   const navigate = useNavigate()
   return (
     <div className="py-2 text-center">
-      <p className="text-sm text-[#6B6560] mb-3">No active subscription</p>
+      <p className="text-sm text-[#6B6560] mb-3">
+        Subscribe &amp; save 10% on every delivery. Start from any bean&apos;s product page.
+      </p>
       <button
         type="button"
         onClick={() => navigate('/order?category=online-performance-coffee')}
         className="w-full py-2.5 text-sm font-semibold bg-[#D4A574] text-white rounded-md"
       >
-        Subscribe to Performance Coffee
+        Browse subscribable beans →
       </button>
     </div>
   )
 }
 
 export function SubscriptionAccordion({ subscription }: Props) {
+  const navigate = useNavigate()
   const rightSlot = subscription ? <StatusPill status={subscription.status} /> : null
+
+  const savingsSnippet = subscription ? (
+    <div className="flex items-center gap-1.5 mt-0.5">
+      <span className="text-xs text-[#6B6560]">10% off every delivery</span>
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); navigate('/subscriptions') }}
+        className="text-xs font-medium leading-none"
+        style={{ color: '#D4A574' }}
+        aria-label="Go to subscription management"
+      >
+        →
+      </button>
+    </div>
+  ) : null
 
   return (
     <Accordion
@@ -144,7 +191,12 @@ export function SubscriptionAccordion({ subscription }: Props) {
       title="Performance Coffee Subscription"
       rightSlot={rightSlot}
       defaultOpen={subscription !== null}
-      collapsedSummary={<CollapsedSummary subscription={subscription} />}
+      collapsedSummary={
+        <div className="flex flex-col gap-0">
+          <CollapsedSummary subscription={subscription} />
+          {savingsSnippet}
+        </div>
+      }
     >
       {subscription ? (
         <ActiveContent subscription={subscription} />
