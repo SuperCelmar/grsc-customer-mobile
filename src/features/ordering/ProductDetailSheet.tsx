@@ -84,8 +84,6 @@ export function ProductDetailSheet({ product, onClose, onViewCart }: Props) {
     <div className="fixed inset-0 z-[60] flex flex-col justify-end">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="relative bg-white rounded-t-2xl max-h-[92vh] flex flex-col overflow-hidden">
-        {/* Hero: monogram fallback for cafe products (no image_url in cafe menu).
-            When Petpooja image URLs ship, swap this block for an <img>. */}
         <div
           className="relative flex-shrink-0 flex items-center justify-center"
           style={{ height: 240, backgroundColor: 'var(--muted)' }}
@@ -102,6 +100,16 @@ export function ProductDetailSheet({ product, onClose, onViewCart }: Props) {
           >
             GR
           </span>
+          {product.image_url && (
+            <img
+              src={product.image_url}
+              alt={product.name}
+              loading="lazy"
+              decoding="async"
+              className="absolute inset-0 w-full h-full object-cover"
+              onError={(e) => { e.currentTarget.style.display = 'none' }}
+            />
+          )}
           {onViewCart && cartCount > 0 && (
             <button
               onClick={() => { onClose(); onViewCart() }}

@@ -406,7 +406,7 @@ function MenuBrowseInner() {
                 key={product.id}
                 name={product.name}
                 priceLabel={`₹${product.price}`}
-                imageUrl={null}
+                imageUrl={product.image_url ?? null}
                 onCardClick={() => handleCafeCardClick(product)}
                 onAddClick={() => handleCafeAddClick(product)}
                 disabled={!isOpen}
