@@ -36,6 +36,8 @@ const ACTIVE_STATUSES = new Set([
 
 const DONE_STATUSES = new Set(['delivered', 'completed', 'done'])
 
+const TERMINAL_STATUSES = new Set(['delivered', 'completed', 'done', 'cancelled', 'cancelled_payment_failed'])
+
 function normalizeStatus(status: string | null | undefined): string {
   return (status ?? '').toLowerCase().replace(/\s+/g, '_')
 }
@@ -161,9 +163,16 @@ export function OrderHistoryScreen() {
 
   const UUID_RE = /^[0-9a-f-]{36}$/
   const activeParam = searchParams.get('active')
-  const activeOrderIds = activeParam
+  const ordersById = new Map(orders.map(o => [o.id, o]))
+  const activeOrderIds = (activeParam
     ? activeParam.split(',').map(id => id.trim()).filter(id => UUID_RE.test(id))
     : []
+  ).filter(id => {
+    // Drop URL-pinned active ids whose order is now terminal (cancelled/delivered).
+    // The order may not yet be in `orders` (just-placed) — keep showing in that case.
+    const o = ordersById.get(id)
+    return !o || !TERMINAL_STATUSES.has(normalizeStatus(o.status))
+  })
 
   const hasActiveSection = activeOrderIds.length > 0 || activeOrders.length > 0
   // Wallet is the source of truth for current cashback balance — summing

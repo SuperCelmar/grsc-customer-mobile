@@ -104,9 +104,14 @@ export function CartDrawer({ onClose, storeRestId, isStoreOpen }: Props) {
 
     try {
       const customer = profile?.customer
+      if (!customer?.phone) {
+        setError('Your phone number is missing from your profile. Sign out and sign in again with phone OTP.')
+        setLoading(false)
+        return
+      }
       const payload: PlaceOrderRequest = {
         customer: {
-          phone: customer?.phone || '',
+          phone: customer.phone,
           name: customer?.name || '',
         },
         order: {
@@ -271,8 +276,27 @@ export function CartDrawer({ onClose, storeRestId, isStoreOpen }: Props) {
 
   return (
     <div className="fixed inset-0 z-[60] flex flex-col justify-end">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div
+        className="absolute inset-0 bg-black/40"
+        onClick={loading ? undefined : onClose}
+      />
       <div className="relative bg-white rounded-t-2xl max-h-[92vh] flex flex-col">
+        {loading && (
+          <div
+            className="absolute inset-0 z-10 bg-white/85 backdrop-blur-sm rounded-t-2xl flex flex-col items-center justify-center px-6"
+            role="status"
+            aria-live="polite"
+          >
+            <div
+              className="animate-spin rounded-full h-10 w-10 border-[3px] border-t-transparent mb-4"
+              style={{ borderColor: 'var(--primary)', borderTopColor: 'transparent' }}
+            />
+            <p className="text-[15px] font-semibold text-[var(--text)]">Placing your order…</p>
+            <p className="text-[13px] text-[var(--text-secondary)] mt-1 text-center">
+              This usually takes a few seconds. Please don't close the app.
+            </p>
+          </div>
+        )}
         <div className="px-4 pt-4 pb-3 flex items-center justify-between border-b border-[var(--card)]">
           <h2 className="text-lg font-semibold text-[var(--text)]">Your Cart</h2>
           <button

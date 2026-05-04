@@ -7,14 +7,22 @@ function isDevMock(): boolean {
   try { return import.meta.env.DEV && sessionStorage.getItem('grsc_dev_session') === '1' } catch { return false }
 }
 
-async function callFunction<T>(name: string, body?: unknown, options?: { method?: string; noAuth?: boolean }): Promise<T> {
+async function callFunction<T>(
+  name: string,
+  body?: unknown,
+  options?: { method?: string; noAuth?: boolean; omitSourceHeader?: boolean }
+): Promise<T> {
   const session = (await supabase.auth.getSession()).data.session
 
   // A real session always wins over the dev mock flag. If the user logged in
   // for real but a stale grsc_dev_session=1 is hanging around in sessionStorage,
   // clear it so subsequent calls are consistent.
   if (session?.access_token) {
-    try { sessionStorage.removeItem('grsc_dev_session') } catch {}
+    try {
+      sessionStorage.removeItem('grsc_dev_session')
+    } catch {
+      // sessionStorage may be unavailable in restricted runtimes.
+    }
   }
 
   // DEV mock: return fake data instead of hitting the real backend.
@@ -32,8 +40,8 @@ async function callFunction<T>(name: string, body?: unknown, options?: { method?
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-    'x-source': 'web',
   }
+  if (!options?.omitSourceHeader) headers['x-source'] = 'web'
   if (session?.access_token && !options?.noAuth) {
     headers['Authorization'] = `Bearer ${session.access_token}`
   }
@@ -51,11 +59,14 @@ async function callFunction<T>(name: string, body?: unknown, options?: { method?
   const data = await response.json()
   if (!response.ok || data.success === false) {
     const msg = data.error || 'Request failed'
-    if (msg.includes('insufficient') || msg.includes('balance')) throw Object.assign(new Error(msg), { code: 'INSUFFICIENT_BALANCE' })
-    if (msg.includes('expired') && msg.includes('allowance')) throw Object.assign(new Error(msg), { code: 'EXPIRED_ALLOWANCE' })
-    if (msg.includes('not found') || msg.includes('reward')) throw Object.assign(new Error(msg), { code: 'REWARD_NOT_FOUND' })
-    if (msg.includes('closed')) throw Object.assign(new Error(msg), { code: 'STORE_CLOSED' })
-    throw new Error(msg)
+    const extra: Record<string, unknown> = {}
+    if (data.upstream) extra.upstream = data.upstream
+    console.error(`[api] ${name} failed (${response.status}): ${msg}`, { ...extra, raw: data })
+    if (msg.includes('insufficient') || msg.includes('balance')) throw Object.assign(new Error(msg), { code: 'INSUFFICIENT_BALANCE', ...extra })
+    if (msg.includes('expired') && msg.includes('allowance')) throw Object.assign(new Error(msg), { code: 'EXPIRED_ALLOWANCE', ...extra })
+    if (msg.includes('not found') || msg.includes('reward')) throw Object.assign(new Error(msg), { code: 'REWARD_NOT_FOUND', ...extra })
+    if (msg.includes('closed')) throw Object.assign(new Error(msg), { code: 'STORE_CLOSED', ...extra })
+    throw Object.assign(new Error(msg), extra)
   }
   return data
 }
@@ -312,7 +323,7 @@ export const api = {
       order_id: orderId,
       cancel_reason: reason,
       cancelled_by: 'customer',
-    }),
+    }, { omitSourceHeader: true }),
 
   getCustomerOrders: (page = 1, limit = 10, activeOnly = false) =>
     callFunction<CustomerOrders>('customer-orders', { page, limit, activeOnly }),
