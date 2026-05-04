@@ -8,6 +8,7 @@ import { ActiveOrderTracker } from './ActiveOrderTracker'
 import { OrderDetailSheet } from './OrderDetailSheet'
 import { QuickReorderRow } from '../reorder/QuickReorderRow'
 import { useReorder } from './useReorder'
+import { useSubscription } from '../subscriptions/useSubscription'
 import type { CustomerOrders } from '../../lib/api'
 import { useCashfree } from '../ordering/useCashfree'
 import { clearSessionByOrderId, loadSessionByOrderId } from '../ordering/useCashfreeSession'
@@ -98,12 +99,30 @@ function OrderTypeBadge({ type }: { type: string | null | undefined }) {
   )
 }
 
-function PastOrderCard({ order, onOpen }: { order: Order; onOpen: () => void }) {
+function PastOrderCard({ order, onOpen, subscriptionProductId, subscriptionFrequency }: {
+  order: Order
+  onOpen: () => void
+  subscriptionProductId: string | null
+  subscriptionFrequency: string | null
+}) {
   const { reorder, canReorder } = useReorder(order)
   const date = new Date(order.order_date).toLocaleDateString('en-IN', {
     day: 'numeric', month: 'short',
   })
   const previewItems = order.items.slice(0, 2)
+
+  // TODO Phase 3.5: use order.is_subscription flag when backend exposes it.
+  // For now, treat all orders as one-time unless a future field indicates otherwise.
+  const isSubscriptionOrder = false
+  const orderTag = isSubscriptionOrder
+    ? `Subscription · ${subscriptionFrequency ?? 'Recurring'}`
+    : 'One-time order'
+  const orderTagColor = isSubscriptionOrder ? '#D4A574' : '#6B6560'
+
+  // Suppress reorder button if every item in this order is the subscribed product
+  const allItemsSubscribed = subscriptionProductId !== null &&
+    order.items.length > 0 &&
+    order.items.every(item => item.id === subscriptionProductId)
 
   return (
     <button
@@ -128,12 +147,13 @@ function PastOrderCard({ order, onOpen }: { order: Order; onOpen: () => void }) 
             <OrderTypeBadge type={order.order_type} />
             <StatusBadge status={order.status} />
           </div>
+          <p className="text-[11px] mt-1" style={{ color: orderTagColor }}>{orderTag}</p>
           {order.cashback_earned > 0 && (
-            <p className="text-[11px] mt-1" style={{ color: '#A0826D' }}>+₹{order.cashback_earned} cashback</p>
+            <p className="text-[11px] mt-0.5" style={{ color: '#A0826D' }}>+₹{order.cashback_earned} cashback</p>
           )}
         </div>
 
-        {canReorder && (
+        {canReorder && !allItemsSubscribed && (
           <button
             onClick={e => { e.stopPropagation(); reorder() }}
             className="flex-shrink-0 h-[26px] px-3 rounded-full text-xs font-medium text-[#1A1410] shadow-sm"
@@ -162,6 +182,14 @@ export function OrderHistoryScreen() {
     isFetchingNextPage,
   } = useCustomerOrdersInfinite()
   const { data: profile } = useCustomerProfile()
+  const subscription = useSubscription()
+
+  const activeSubProductId = subscription?.status === 'active' ? subscription.productId : null
+  const activeSubFrequency = subscription?.frequency === 'biweekly'
+    ? 'Biweekly'
+    : subscription?.frequency === 'monthly'
+    ? 'Monthly'
+    : null
 
   const orders = data?.pages.flatMap(p => p.orders) ?? []
   const activeOrders = orders.filter(o => ACTIVE_STATUSES.has(normalizeStatus(o.status)))
@@ -324,6 +352,8 @@ export function OrderHistoryScreen() {
                   key={order.id}
                   order={order}
                   onOpen={() => setSelectedOrder(order)}
+                  subscriptionProductId={activeSubProductId}
+                  subscriptionFrequency={activeSubFrequency}
                 />
               ))}
             </div>
