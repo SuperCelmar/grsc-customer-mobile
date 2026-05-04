@@ -1,6 +1,7 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { House, Coffee, History, Repeat, CircleUser, type LucideIcon } from 'lucide-react'
 import { useReorder } from '../features/orders/useReorder'
+import { useSubscription } from '../features/subscriptions/useSubscription'
 
 const tabs: { path: string; icon: LucideIcon; label: string }[] = [
   { path: '/dashboard', icon: House, label: 'Home' },
@@ -14,6 +15,9 @@ export function BottomNav() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const { canReorder, reorder } = useReorder()
+  const sub = useSubscription()
+
+  const subsHasDot = sub?.status === 'active' && sub.inEditWindow
 
   if (pathname.startsWith('/checkout')) return null
 
@@ -28,6 +32,7 @@ export function BottomNav() {
     <nav className="fixed bottom-0 left-0 right-0 z-50 max-w-[430px] mx-auto bg-white border-t border-card flex px-2 pb-[env(safe-area-inset-bottom)]">
       {tabs.map(({ path, icon: Icon, label }) => {
         const isActive = isTabActive(path)
+        const showDot = path === '/subscriptions' && subsHasDot
         const handleClick = () => {
           if (path === '/orders') {
             if (canReorder) reorder()
@@ -45,7 +50,16 @@ export function BottomNav() {
             }`}
             aria-current={isActive ? 'page' : undefined}
           >
-            <Icon size={22} strokeWidth={isActive ? 2.5 : 2} />
+            <span className="relative">
+              <Icon size={22} strokeWidth={isActive ? 2.5 : 2} />
+              {showDot && (
+                <span
+                  className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full"
+                  style={{ backgroundColor: '#D4A574', boxShadow: '0 0 0 1.5px white' }}
+                  aria-label="Action needed"
+                />
+              )}
+            </span>
             <span className="text-[10px] font-medium leading-none">{label}</span>
           </button>
         )

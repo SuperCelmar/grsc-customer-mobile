@@ -4,6 +4,7 @@ import { useCustomerOrders } from '../../hooks/useCustomerProfile'
 import { useCart } from '../../contexts/CartContext'
 import { useReorder } from '../orders/useReorder'
 import { getTopOrderedItems } from '../orders/topItems'
+import { useSubscription } from '../subscriptions/useSubscription'
 import type { CafeCartItem } from '../../contexts/CartContext'
 import type { CustomerOrders } from '../../lib/api'
 
@@ -54,6 +55,7 @@ export function QuickReorderRow() {
   const { data } = useCustomerOrders(1)
   const { addCafeItem } = useCart()
   const { canReorder, reorder } = useReorder()
+  const subscription = useSubscription()
 
   const orders = data?.orders ?? []
   const topItems = getTopOrderedItems(orders, 2)
@@ -63,6 +65,14 @@ export function QuickReorderRow() {
   const lastDate = lastOrder
     ? new Date(lastOrder.order_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
     : null
+
+  const activeSubProductId = subscription?.status === 'active' ? subscription.productId : null
+
+  const frequencyLabel = subscription?.frequency === 'biweekly'
+    ? 'every 2 weeks'
+    : subscription?.frequency === 'monthly'
+    ? 'every month'
+    : 'on schedule'
 
   if (isEmpty) {
     return (
@@ -135,45 +145,76 @@ export function QuickReorderRow() {
         {topItems.map(topItem => {
           const usualAddons = getMostFrequentAddons(orders, topItem.id)
           const usualSpec = buildUsualSpec(usualAddons)
+          const isSubscribed = activeSubProductId !== null && topItem.source_item.id === activeSubProductId
+
           return (
-            <div
-              key={topItem.id}
-              className="flex-shrink-0 w-[150px] snap-start border border-[#E8DDD0] rounded-[6px] bg-white p-3 relative"
-            >
-              <div
-                className="w-[52px] h-[52px] rounded-[6px] bg-[#F5EFE9] flex items-center justify-center text-[#6B6560] text-sm font-medium mb-2 overflow-hidden"
-              >
-                {topItem.name.charAt(0)}
+            <div key={topItem.id} className="flex-shrink-0 w-[150px] snap-start flex flex-col gap-0">
+              {/* Item card */}
+              <div className="border border-[#E8DDD0] rounded-[6px] bg-white p-3 relative">
+                <div
+                  className="w-[52px] h-[52px] rounded-[6px] bg-[#F5EFE9] flex items-center justify-center text-[#6B6560] text-sm font-medium mb-2 overflow-hidden"
+                >
+                  {topItem.name.charAt(0)}
+                </div>
+                <p className="text-[14px] text-[#1A1410] font-medium leading-snug line-clamp-2">{topItem.name}</p>
+                {usualSpec && (
+                  <p className="text-[11px] mt-0.5 leading-snug" style={{ color: '#6B6560' }}>
+                    Usual: {usualSpec}
+                  </p>
+                )}
+                <p className="text-[12px] text-[#6B6560] mt-0.5">₹{topItem.price}</p>
+
+                {isSubscribed ? (
+                  /* Auto-shipping pill replaces add button for subscribed items */
+                  <div
+                    className="mt-2 inline-flex items-center px-2 py-1 rounded-[4px] text-[11px] font-medium"
+                    style={{ backgroundColor: '#F5EFE9', color: '#6B6560' }}
+                  >
+                    Auto-shipping {frequencyLabel}
+                  </div>
+                ) : (
+                  /* TODO (next sprint): open ProductDetailSheet prefilled with usualAddons once it accepts a defaultAddons prop */
+                  <button
+                    onClick={() => {
+                      const cartItem: CafeCartItem = {
+                        cartItemId: generateId(),
+                        productId: topItem.source_item.id,
+                        productCode: topItem.source_item.id,
+                        name: topItem.name,
+                        price: topItem.price,
+                        quantity: 1,
+                        addons: usualAddons.map(a => ({ id: a.addon_name, name: a.addon_name, price: a.addon_price, groupName: '' })),
+                        specialInstructions: '',
+                      }
+                      addCafeItem(cartItem)
+                      toast.success(`${topItem.name} added to cart`)
+                    }}
+                    className="absolute bottom-3 right-3 w-7 h-7 rounded-full flex items-center justify-center text-[#1A1410] text-lg leading-none shadow-sm"
+                    style={{ backgroundColor: '#D4A574' }}
+                    aria-label={`Add ${topItem.name} to cart`}
+                  >
+                    +
+                  </button>
+                )}
               </div>
-              <p className="text-[14px] text-[#1A1410] font-medium leading-snug line-clamp-2">{topItem.name}</p>
-              {usualSpec && (
-                <p className="text-[11px] mt-0.5 leading-snug" style={{ color: '#6B6560' }}>
-                  Usual: {usualSpec}
-                </p>
+
+              {/* Convert-to-subscription banner — shown for items reordered ≥3 times (topItems threshold) */}
+              {!isSubscribed && (
+                <button
+                  onClick={() => navigate(`/order?subscribe=1&productId=${encodeURIComponent(topItem.source_item.id)}`)}
+                  className="w-full mt-1.5 px-2 py-1.5 border border-[#D4A574] rounded-[6px] bg-white flex items-center gap-1.5 text-left"
+                >
+                  <span
+                    className="flex-shrink-0 px-1.5 py-0.5 rounded-[3px] text-[10px] font-semibold text-white"
+                    style={{ backgroundColor: '#D4A574' }}
+                  >
+                    SAVE 10%
+                  </span>
+                  <span className="text-[11px] leading-snug" style={{ color: '#D4A574' }}>
+                    Subscribe — never reorder again →
+                  </span>
+                </button>
               )}
-              <p className="text-[12px] text-[#6B6560] mt-0.5">₹{topItem.price}</p>
-              {/* TODO (next sprint): open ProductDetailSheet prefilled with usualAddons once it accepts a defaultAddons prop */}
-              <button
-                onClick={() => {
-                  const cartItem: CafeCartItem = {
-                    cartItemId: generateId(),
-                    productId: topItem.source_item.id,
-                    productCode: topItem.source_item.id,
-                    name: topItem.name,
-                    price: topItem.price,
-                    quantity: 1,
-                    addons: usualAddons.map(a => ({ id: a.addon_name, name: a.addon_name, price: a.addon_price, groupName: '' })),
-                    specialInstructions: '',
-                  }
-                  addCafeItem(cartItem)
-                  toast.success(`${topItem.name} added to cart`)
-                }}
-                className="absolute bottom-3 right-3 w-7 h-7 rounded-full flex items-center justify-center text-[#1A1410] text-lg leading-none shadow-sm"
-                style={{ backgroundColor: '#D4A574' }}
-                aria-label={`Add ${topItem.name} to cart`}
-              >
-                +
-              </button>
             </div>
           )
         })}

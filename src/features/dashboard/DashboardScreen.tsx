@@ -8,6 +8,7 @@ import { HomeHeader } from './HomeHeader'
 import { HomeSearchBar } from './HomeSearchBar'
 import { CategoryIconsRow } from './CategoryIconsRow'
 import { HeroBanner } from './HeroBanner'
+import { SubscriptionStateBlock } from './SubscriptionStateBlock'
 import { PerformanceCoffeeGrid } from './PerformanceCoffeeGrid'
 import { LoyaltyOfferBanner } from './LoyaltyOfferBanner'
 import type { StoreMenu } from '../../lib/api'
@@ -130,6 +131,8 @@ function DashboardInner() {
           potentialCashback={potentialCashback}
           onClick={() => navigate('/order?category=online-performance-coffee')}
         />
+
+        <SubscriptionStateBlock />
 
         {hasPerformanceCoffee && (
           <>
