@@ -2,15 +2,15 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { toast } from 'sonner'
 import { ScreenHeader } from '../../components/ScreenHeader'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import { useCart } from '../../contexts/CartContext'
 import { useCustomerProfile, useStoreStatus } from '../../hooks/useCustomerProfile'
 import { useOrdering } from './OrderingContext'
 import { api } from '../../lib/api'
-import type { CustomerAddress, LoyaltyReward, PlaceOrderRequest } from '../../lib/api'
+import type { LoyaltyReward, PlaceOrderRequest } from '../../lib/api'
 import { useRazorpay } from './useRazorpay'
 import { useCashfree } from './useCashfree'
-import { AddressBottomSheet } from './AddressBottomSheet'
+import { OrderProcessingOverlay } from './OrderProcessingOverlay'
 import { getMissingCheckoutFields } from './checkoutValidation'
 import { RewardPicker } from '../orders/RewardPicker'
 
@@ -44,23 +44,15 @@ export function UnifiedCheckoutScreen() {
   const { open: openCashfree } = useCashfree()
 
   const [selectedProvider, setSelectedProvider] = useState<string>(defaultProvider)
-  const [manualAddressId, setManualAddressId] = useState<string | null>(null)
-  const [showAddressSheet, setShowAddressSheet] = useState(false)
   const [paymentType, setPaymentType] = useState<'COD' | 'ONLINE' | 'CARD'>('ONLINE')
   const [selectedReward, setSelectedReward] = useState<LoyaltyReward | null>(null)
   const [loading, setLoading] = useState(false)
   const [banner, setBanner] = useState<string | null>(null)
 
-  const { data: addresses = [], isLoading: addressesLoading } = useQuery({
-    queryKey: ['addresses'],
-    queryFn: api.listAddresses,
-  })
-
-  const defaultAddressId = addresses.length > 0
-    ? (addresses.find(a => a.is_default) ?? addresses[0]).address_id
-    : null
-  const selectedAddressId = manualAddressId ?? defaultAddressId
-  const setSelectedAddressId = setManualAddressId
+  // Single address surfaced from customer profile (customer.customers.address_*).
+  // No multi-address picker any more.
+  const profileAddress = profile?.customer.address_line1 ? profile.customer : null
+  const selectedAddressId: string | null = profileAddress ? profile!.customer.id : null
 
   const taxEstimate = Math.round(cafeSubtotal * 0.18)
   const cafeTotal = cafeSubtotal + taxEstimate
@@ -70,6 +62,7 @@ export function UnifiedCheckoutScreen() {
   const payableCafeTotal = Math.max(0, cafeTotal - rewardDiscount)
   const shopSubtotal = shopSubtotalPaise / 100
   const grandTotal = payableCafeTotal + shopSubtotal
+  const processingIntent = paymentType === 'COD' ? 'mixed-cash' : 'mixed-online'
 
   const missingFields = getMissingCheckoutFields({
     selectedAddressId,
@@ -92,12 +85,6 @@ export function UnifiedCheckoutScreen() {
   function handleBack() {
     if ((location.key ?? 'default') !== 'default') navigate(-1)
     else navigate('/order')
-  }
-
-  function handleAddressAdded(address: CustomerAddress) {
-    qc.invalidateQueries({ queryKey: ['addresses'] })
-    setSelectedAddressId(address.address_id)
-    setShowAddressSheet(false)
   }
 
   function payShopWithRazorpay(): Promise<PaymentResult> {
@@ -333,14 +320,20 @@ export function UnifiedCheckoutScreen() {
     return null
   }
 
-  const selectedAddress = addresses.find(a => a.address_id === selectedAddressId) ?? null
-
   return (
-    <div className="min-h-screen bg-[var(--muted)] max-w-[430px] mx-auto flex flex-col">
+    <div className="relative min-h-screen bg-[var(--muted)] max-w-[430px] mx-auto flex flex-col">
       <ScreenHeader
         title="Checkout"
         onBack={handleBack}
       />
+
+      {loading && (
+        <OrderProcessingOverlay
+          intent={processingIntent}
+          totalLabel={`₹${grandTotal.toFixed(0)}+ checkout`}
+          className="absolute inset-0"
+        />
+      )}
 
       <div className={`flex-1 overflow-y-auto pb-28 px-4 py-4 space-y-4 ${loading ? 'pointer-events-none opacity-60' : ''}`}>
         {!isStoreOpen && (
@@ -376,64 +369,21 @@ export function UnifiedCheckoutScreen() {
           </div>
 
           <div className="border-t border-[var(--card)] pt-2 space-y-1">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-[var(--text)]">Delivery Address</h3>
-              <button
-                onClick={() => setShowAddressSheet(true)}
-                disabled={loading}
-                className="text-xs font-medium disabled:opacity-40"
-                style={{ color: 'var(--primary)' }}
-              >
-                {selectedAddress ? 'Change' : '+ Add new address'}
-              </button>
-            </div>
-
-            {addressesLoading ? (
-              <div className="flex justify-center py-2">
-                <div className="animate-spin rounded-full h-6 w-6 border-2 border-[var(--primary)] border-t-transparent" />
-              </div>
-            ) : addresses.length === 0 ? (
-              <p className="text-sm text-[var(--text-secondary)]">No saved addresses. Please add one.</p>
-            ) : selectedAddress ? (
+            <h3 className="text-sm font-semibold text-[var(--text)]">Delivery Address</h3>
+            {profileAddress ? (
               <div className="text-sm text-[var(--text)]">
-                {selectedAddress.label && (
-                  <p className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wide">
-                    {selectedAddress.label}
-                  </p>
-                )}
-                <p>{selectedAddress.line1}{selectedAddress.line2 ? `, ${selectedAddress.line2}` : ''}</p>
+                <p>
+                  {profileAddress.address_line1}
+                  {profileAddress.address_line2 ? `, ${profileAddress.address_line2}` : ''}
+                </p>
                 <p className="text-xs text-[var(--text-secondary)]">
-                  {selectedAddress.city}, {selectedAddress.state} - {selectedAddress.pincode}
+                  {profileAddress.city}, {profileAddress.state} - {profileAddress.zip_code}
                 </p>
               </div>
             ) : (
-              <div className="space-y-2">
-                {addresses.map(addr => (
-                  <label
-                    key={addr.address_id}
-                    className="flex items-start gap-3 p-2 rounded-lg border cursor-pointer"
-                    style={{
-                      borderColor: 'var(--card)',
-                      backgroundColor: 'white',
-                    }}
-                  >
-                    <input
-                      type="radio"
-                      name="address"
-                      value={addr.address_id}
-                      checked={false}
-                      onChange={() => setSelectedAddressId(addr.address_id)}
-                      className="mt-0.5"
-                    />
-                    <div className="flex-1">
-                      <p className="text-sm text-[var(--text)]">{addr.line1}</p>
-                      <p className="text-xs text-[var(--text-secondary)]">
-                        {addr.city}, {addr.state} - {addr.pincode}
-                      </p>
-                    </div>
-                  </label>
-                ))}
-              </div>
+              <p className="text-sm text-[var(--text-secondary)]">
+                No address on file. Add one in your profile to continue.
+              </p>
             )}
           </div>
 
@@ -597,13 +547,6 @@ export function UnifiedCheckoutScreen() {
           Payment first, then we'll submit your cafe order.
         </p>
       </div>
-
-      {showAddressSheet && (
-        <AddressBottomSheet
-          onSelected={handleAddressAdded}
-          onCancel={() => setShowAddressSheet(false)}
-        />
-      )}
     </div>
   )
 }

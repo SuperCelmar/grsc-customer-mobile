@@ -6,6 +6,14 @@ import { OrderHistoryScreen } from '../OrderHistoryScreen'
 vi.mock('../../../hooks/useCustomerProfile', () => ({
   useCustomerProfile: () => ({ data: null }),
   useCustomerOrders: () => ({ data: { orders: [], hasMore: false }, isLoading: false, error: null }),
+  useCustomerOrdersInfinite: () => ({
+    data: { pages: [{ orders: [], hasMore: false }] },
+    isLoading: false,
+    error: null,
+    fetchNextPage: () => {},
+    hasNextPage: false,
+    isFetchingNextPage: false,
+  }),
 }))
 
 vi.mock('../../../components/ScreenHeader', () => ({

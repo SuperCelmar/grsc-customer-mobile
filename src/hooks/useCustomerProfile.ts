@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query'
 import { api } from '../lib/api'
 import type { PlaceOrderRequest } from '../lib/api'
 
@@ -37,6 +37,16 @@ export const useCustomerOrders = (page = 1) =>
   useQuery({
     queryKey: ['customer-orders', page],
     queryFn: () => api.getCustomerOrders(page),
+    staleTime: 30_000,
+  })
+
+export const useCustomerOrdersInfinite = () =>
+  useInfiniteQuery({
+    queryKey: ['customer-orders', 'infinite'],
+    initialPageParam: 1,
+    queryFn: ({ pageParam }) => api.getCustomerOrders(pageParam as number),
+    getNextPageParam: (lastPage, _allPages, lastPageParam) =>
+      lastPage.hasMore ? (lastPageParam as number) + 1 : undefined,
     staleTime: 30_000,
   })
 

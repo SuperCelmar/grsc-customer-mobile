@@ -7,14 +7,24 @@ function isDevMock(): boolean {
   try { return import.meta.env.DEV && sessionStorage.getItem('grsc_dev_session') === '1' } catch { return false }
 }
 
-async function callFunction<T>(name: string, body?: unknown, options?: { method?: string; noAuth?: boolean }): Promise<T> {
+const DEFAULT_TIMEOUT_MS = 30_000
+
+async function callFunction<T>(
+  name: string,
+  body?: unknown,
+  options?: { method?: string; noAuth?: boolean; omitSourceHeader?: boolean; timeoutMs?: number }
+): Promise<T> {
   const session = (await supabase.auth.getSession()).data.session
 
   // A real session always wins over the dev mock flag. If the user logged in
   // for real but a stale grsc_dev_session=1 is hanging around in sessionStorage,
   // clear it so subsequent calls are consistent.
   if (session?.access_token) {
-    try { sessionStorage.removeItem('grsc_dev_session') } catch {}
+    try {
+      sessionStorage.removeItem('grsc_dev_session')
+    } catch {
+      // sessionStorage may be unavailable in restricted runtimes.
+    }
   }
 
   // DEV mock: return fake data instead of hitting the real backend.
@@ -32,8 +42,8 @@ async function callFunction<T>(name: string, body?: unknown, options?: { method?
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-    'x-source': 'web',
   }
+  if (!options?.omitSourceHeader) headers['x-source'] = 'web'
   if (session?.access_token && !options?.noAuth) {
     headers['Authorization'] = `Bearer ${session.access_token}`
   }
@@ -43,19 +53,39 @@ async function callFunction<T>(name: string, body?: unknown, options?: { method?
   if (!session?.access_token && isDevMock() && name === 'cashfree-order-create') {
     headers['x-dev-phone'] = getActiveTestPhone()
   }
-  const response = await fetch(`${FUNCTIONS_URL}/${name}`, {
-    method: options?.method || 'POST',
-    headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  })
+  const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  let response: Response
+  try {
+    response = await fetch(`${FUNCTIONS_URL}/${name}`, {
+      method: options?.method || 'POST',
+      headers,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+      signal: controller.signal,
+    })
+  } catch (err) {
+    if ((err as { name?: string })?.name === 'AbortError') {
+      throw Object.assign(
+        new Error('The request is taking longer than expected. Please check Orders to confirm — your order may have gone through.'),
+        { code: 'TIMEOUT' }
+      )
+    }
+    throw err
+  } finally {
+    clearTimeout(timer)
+  }
   const data = await response.json()
   if (!response.ok || data.success === false) {
     const msg = data.error || 'Request failed'
-    if (msg.includes('insufficient') || msg.includes('balance')) throw Object.assign(new Error(msg), { code: 'INSUFFICIENT_BALANCE' })
-    if (msg.includes('expired') && msg.includes('allowance')) throw Object.assign(new Error(msg), { code: 'EXPIRED_ALLOWANCE' })
-    if (msg.includes('not found') || msg.includes('reward')) throw Object.assign(new Error(msg), { code: 'REWARD_NOT_FOUND' })
-    if (msg.includes('closed')) throw Object.assign(new Error(msg), { code: 'STORE_CLOSED' })
-    throw new Error(msg)
+    const extra: Record<string, unknown> = {}
+    if (data.upstream) extra.upstream = data.upstream
+    console.error(`[api] ${name} failed (${response.status}): ${msg}`, { ...extra, raw: data })
+    if (msg.includes('insufficient') || msg.includes('balance')) throw Object.assign(new Error(msg), { code: 'INSUFFICIENT_BALANCE', ...extra })
+    if (msg.includes('expired') && msg.includes('allowance')) throw Object.assign(new Error(msg), { code: 'EXPIRED_ALLOWANCE', ...extra })
+    if (msg.includes('not found') || msg.includes('reward')) throw Object.assign(new Error(msg), { code: 'REWARD_NOT_FOUND', ...extra })
+    if (msg.includes('closed')) throw Object.assign(new Error(msg), { code: 'STORE_CLOSED', ...extra })
+    throw Object.assign(new Error(msg), extra)
   }
   return data
 }
@@ -70,6 +100,11 @@ export type CustomerProfile = {
     phone: string
     email: string | null
     created_at: string
+    address_line1: string | null
+    address_line2: string | null
+    city: string | null
+    state: string | null
+    zip_code: string | null
   }
   membership: {
     membership_id: string
@@ -109,6 +144,7 @@ export type StoreMenu = {
     id: string
     name: string
     description: string | null
+    image_url?: string | null
     price: number
     category_ids: string[]
     addon_groups: Array<{
@@ -212,7 +248,10 @@ export type PlaceOrderResponse = {
 
 export type OnlineOrderRequest = {
   items: Array<{ variant_id: string; quantity: number }>
-  shipping_address_id: string
+  // Field still sent for backend compatibility (Step 1 check 6 — backend
+  // confirmation pending). Sourced from customer.customers.address_* via
+  // customer-profile GET; null if profile has no address.
+  shipping_address_id: string | null
   applied_reward_id?: string
 }
 
@@ -235,19 +274,6 @@ export type VerifyPaymentRequest = {
   razorpay_order_id: string
   razorpay_payment_id: string
   razorpay_signature: string
-}
-
-export type CustomerAddress = {
-  address_id: string
-  customer_id: string
-  label: string | null
-  line1: string
-  line2: string | null
-  city: string
-  state: string
-  pincode: string
-  is_default: boolean
-  created_at: string
 }
 
 export type LoyaltyReward = {
@@ -316,7 +342,7 @@ export const api = {
       order_id: orderId,
       cancel_reason: reason,
       cancelled_by: 'customer',
-    }),
+    }, { omitSourceHeader: true }),
 
   getCustomerOrders: (page = 1, limit = 10, activeOnly = false) =>
     callFunction<CustomerOrders>('customer-orders', { page, limit, activeOnly }),
@@ -344,30 +370,4 @@ export const api = {
 
   manageSubscription: (id: string, action: 'pause' | 'resume' | 'cancel', reason?: string) =>
     callFunction<{ success: boolean }>('subscription-manage', { id, action, ...(reason ? { reason } : {}) }),
-
-  // Addresses (direct table access via RLS)
-  listAddresses: async (): Promise<CustomerAddress[]> => {
-    const { data, error } = await supabase
-      .from('customer_addresses')
-      .select('*')
-      .order('is_default', { ascending: false })
-      .order('created_at', { ascending: false })
-    if (error) throw new Error(error.message)
-    return (data as CustomerAddress[]) || []
-  },
-
-  createAddress: async (address: Omit<CustomerAddress, 'address_id' | 'customer_id' | 'created_at'>): Promise<CustomerAddress> => {
-    const { data, error } = await supabase
-      .from('customer_addresses')
-      .insert(address)
-      .select()
-      .single()
-    if (error) throw new Error(error.message)
-    return data as CustomerAddress
-  },
-
-  deleteAddress: async (address_id: string): Promise<void> => {
-    const { error } = await supabase.from('customer_addresses').delete().eq('address_id', address_id)
-    if (error) throw new Error(error.message)
-  },
 }

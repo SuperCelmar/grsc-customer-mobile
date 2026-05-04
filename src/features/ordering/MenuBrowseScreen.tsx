@@ -86,29 +86,30 @@ function ProductCard({
         className="block w-full text-left disabled:opacity-60"
       >
         <div
-          className="aspect-square w-full flex items-center justify-center"
+          className="relative aspect-square w-full flex items-center justify-center overflow-hidden"
           style={{ backgroundColor: 'var(--muted)', borderRadius: 6 }}
         >
-          {imageUrl ? (
+          <span
+            className="font-semibold"
+            style={{
+              fontFamily: 'serif',
+              color: 'var(--primary)',
+              fontSize: 28,
+              letterSpacing: 1,
+            }}
+          >
+            GR
+          </span>
+          {imageUrl && (
             <img
               src={imageUrl}
               alt={name}
               loading="lazy"
-              className="w-full h-full object-cover"
+              decoding="async"
+              className="absolute inset-0 w-full h-full object-cover"
               style={{ borderRadius: 6 }}
+              onError={(e) => { e.currentTarget.style.display = 'none' }}
             />
-          ) : (
-            <span
-              className="font-semibold"
-              style={{
-                fontFamily: 'serif',
-                color: 'var(--primary)',
-                fontSize: 28,
-                letterSpacing: 1,
-              }}
-            >
-              GR
-            </span>
           )}
         </div>
         <div className="px-2.5 pt-2 pb-2.5">
@@ -308,6 +309,7 @@ function MenuBrowseInner() {
       productCode: product.id,
       name: product.name,
       price: product.price,
+      imageUrl: product.image_url ?? null,
       quantity: 1,
       addons: [],
       specialInstructions: '',
@@ -406,7 +408,7 @@ function MenuBrowseInner() {
                 key={product.id}
                 name={product.name}
                 priceLabel={`₹${product.price}`}
-                imageUrl={null}
+                imageUrl={product.image_url ?? null}
                 onCardClick={() => handleCafeCardClick(product)}
                 onAddClick={() => handleCafeAddClick(product)}
                 disabled={!isOpen}

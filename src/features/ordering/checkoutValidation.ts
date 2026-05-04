@@ -14,7 +14,7 @@ export function getMissingCheckoutFields(opts: {
   if (!selectedAddressId) {
     missing.push({
       key: 'address',
-      label: 'Add a delivery address',
+      label: 'Add a delivery address to your profile',
       sectionId: 'checkout-address-section',
     })
   }

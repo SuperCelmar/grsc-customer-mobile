@@ -15,7 +15,15 @@ vi.mock('react-router-dom', () => ({
 }))
 
 vi.mock('../../../hooks/useCustomerProfile', () => ({
-  useCustomerProfile: () => ({ data: null }),
+  useCustomerProfile: () => ({
+    data: {
+      customer: {
+        id: 'customer-1',
+        phone: '9000000005',
+        name: 'Test Customer',
+      },
+    },
+  }),
 }))
 
 vi.mock('../../../lib/api', () => ({
@@ -97,6 +105,8 @@ describe('CartDrawer.handlePlaceOrder — COD branch', () => {
 
     renderDrawer()
     fireEvent.click(screen.getByRole('button', { name: /Place Order/i }))
+
+    expect(screen.getByText('Sending your order')).toBeInTheDocument()
 
     await waitFor(() => {
       expect(mockPlaceOrder).toHaveBeenCalledOnce()

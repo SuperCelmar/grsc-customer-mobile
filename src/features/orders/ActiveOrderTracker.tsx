@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { api } from '../../lib/api'
@@ -42,6 +43,7 @@ const STEP_INDEX: Record<FulfillmentStatus, number> = {
 
 const TERMINAL: Set<FulfillmentStatus> = new Set(['DELIVERED', 'CANCELLED'])
 const CANCELLABLE: Set<FulfillmentStatus> = new Set(['PLACED', 'CONFIRMED'])
+const CANCEL_CONFIRM_EVENT = 'grsc:order-cancel-confirm'
 
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -49,12 +51,24 @@ function formatTime(iso: string): string {
 
 export function ActiveOrderTracker({ orderId, onResumePayment }: Props) {
   const navigate = useNavigate()
+  const qc = useQueryClient()
   const isValidId = UUID_RE.test(orderId) || orderId.startsWith('mock-')
   const isMockOrder = orderId.startsWith('mock-')
   const [order, setOrder] = useState<OrderState | null>(null)
   const [fetchDone, setFetchDone] = useState(!isValidId)
   const [reconnecting, setReconnecting] = useState(false)
   const [cancelState, setCancelState] = useState<'idle' | 'confirming' | 'cancelling'>('idle')
+
+  useEffect(() => {
+    function handleOtherConfirm(event: Event) {
+      if ((event as CustomEvent<string>).detail !== orderId) {
+        setCancelState(state => state === 'confirming' ? 'idle' : state)
+      }
+    }
+
+    window.addEventListener(CANCEL_CONFIRM_EVENT, handleOtherConfirm)
+    return () => window.removeEventListener(CANCEL_CONFIRM_EVENT, handleOtherConfirm)
+  }, [orderId])
 
   const fetchOrder = useCallback(async () => {
     if (isMockOrder) {
@@ -82,9 +96,11 @@ export function ActiveOrderTracker({ orderId, onResumePayment }: Props) {
     fetchOrder()
   }, [isValidId, fetchOrder])
 
+  const currentStatus = order?.fulfillment_status
+
   useEffect(() => {
     if (!isValidId || isMockOrder) return
-    if (order && TERMINAL.has(order.fulfillment_status)) return
+    if (currentStatus && TERMINAL.has(currentStatus)) return
 
     const channel = supabase
       .channel('order-fulfillment-' + orderId)
@@ -100,27 +116,41 @@ export function ActiveOrderTracker({ orderId, onResumePayment }: Props) {
       )
       .subscribe((state: string) => {
         if (state === 'CHANNEL_ERROR') setReconnecting(true)
-        if (state === 'SUBSCRIBED') {
-          setReconnecting(false)
-          fetchOrder()
-        }
+        if (state === 'SUBSCRIBED') setReconnecting(false)
       })
 
     return () => { channel.unsubscribe() }
-  }, [orderId, isMockOrder, isValidId, order, fetchOrder])
+  }, [orderId, isMockOrder, isValidId, currentStatus, fetchOrder])
 
   async function handleCancel() {
     setCancelState('cancelling')
     try {
       await api.cancelOrder(orderId, 'Customer cancelled from app')
       toast.success('Order cancelled')
-      fetchOrder()
+      setOrder(prev => prev
+        ? {
+            ...prev,
+            fulfillment_status: 'CANCELLED',
+            events: [
+              ...prev.events,
+              { id: `local-cancel-${orderId}`, to_state: 'CANCELLED', created_at: new Date().toISOString() },
+            ],
+          }
+        : prev
+      )
+      setCancelState('idle')
+      qc.invalidateQueries({ queryKey: ['customer-orders'] })
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to cancel order')
       // Refetch — if the order was already cancelled server-side, render the correct state
       await fetchOrder()
       setCancelState('idle')
     }
+  }
+
+  function handleStartCancelConfirm() {
+    window.dispatchEvent(new CustomEvent(CANCEL_CONFIRM_EVENT, { detail: orderId }))
+    setCancelState('confirming')
   }
 
   // Invalid UUID or order not found after fetch — show degraded null state
@@ -171,6 +201,7 @@ export function ActiveOrderTracker({ orderId, onResumePayment }: Props) {
     <div
       className="rounded-xl border p-4"
       style={{ borderColor: 'var(--card)', backgroundColor: 'var(--muted)' }}
+      onClick={(event) => event.stopPropagation()}
     >
       <div className="flex items-start justify-between mb-1">
         <h3 className="text-sm font-semibold text-[var(--text)]">
@@ -272,7 +303,7 @@ export function ActiveOrderTracker({ orderId, onResumePayment }: Props) {
               </div>
             ) : (
               <button
-                onClick={() => setCancelState('confirming')}
+                onClick={handleStartCancelConfirm}
                 disabled={cancelState === 'cancelling'}
                 className="text-xs font-medium disabled:opacity-50"
                 style={{ color: '#B42C1F' }}

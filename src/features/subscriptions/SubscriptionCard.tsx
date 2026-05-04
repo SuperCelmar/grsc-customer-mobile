@@ -1,4 +1,5 @@
 import type { SubscriptionStatus, SubscriptionInterval } from '../../lib/api'
+import { ProductImage } from '../../components/ProductImage'
 
 type Props = {
   id: string
@@ -39,21 +40,6 @@ function cadenceText(interval: SubscriptionInterval, count: number): string {
   return `Every ${count} ${interval}${count > 1 ? 's' : ''}`
 }
 
-function GRMonogram() {
-  return (
-    <div
-      className="flex-shrink-0 flex items-center justify-center"
-      style={{
-        width: 56, height: 56, borderRadius: 6,
-        backgroundColor: 'var(--muted)', fontFamily: 'serif',
-        color: 'var(--primary)', fontSize: 22, fontWeight: 600, letterSpacing: 1,
-      }}
-    >
-      GR
-    </div>
-  )
-}
-
 export function SubscriptionCard({
   productName, variantName, imageUrl,
   interval, interval_count, nextShipmentAt, status, priceSnapshot, onManage,
@@ -65,17 +51,7 @@ export function SubscriptionCard({
   return (
     <div className="bg-white rounded-lg border border-[var(--card)] p-3">
       <div className="flex items-start gap-3">
-        {imageUrl ? (
-          <img
-            src={imageUrl}
-            alt={productName}
-            loading="lazy"
-            className="flex-shrink-0 object-cover"
-            style={{ width: 56, height: 56, borderRadius: 6 }}
-          />
-        ) : (
-          <GRMonogram />
-        )}
+        <ProductImage src={imageUrl} alt={productName} size={56} />
 
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">

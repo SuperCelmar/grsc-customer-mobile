@@ -62,7 +62,7 @@ const TEST_PROFILES: Record<string, CustomerProfile> = {
   // Aarav — Pro Active, mid balance
   '9000000001': {
     success: true,
-    customer: { id: 'a0000001-0000-0000-0000-000000000001', name: 'Aarav Pro', phone: '9000000001', email: 'aarav.pro+test@grsc.dev', created_at: daysAgo(90) },
+    customer: { id: 'a0000001-0000-0000-0000-000000000001', name: 'Aarav Pro', phone: '9000000001', email: 'aarav.pro+test@grsc.dev', created_at: daysAgo(90), address_line1: null, address_line2: null, city: null, state: null, zip_code: null },
     membership: { membership_id: 'mem-pro', tier: 'pro', status: 'Active', free_coffee_balance: 3, allowance_starts_at: daysAgo(30), allowance_ends_at: daysFromNow(335), daily_coffee_start_date: daysAgo(5) },
     wallet: { cashback_balance: 150.00, potential_cashback_balance: 45.00, cashback_lifetime_earned: 650.00 },
     recent_transactions: aaravTransactions,
@@ -70,7 +70,7 @@ const TEST_PROFILES: Record<string, CustomerProfile> = {
   // Diya — Elite Active, high balance
   '9000000002': {
     success: true,
-    customer: { id: 'a0000001-0000-0000-0000-000000000002', name: 'Diya Elite', phone: '9000000002', email: 'diya.elite+test@grsc.dev', created_at: daysAgo(120) },
+    customer: { id: 'a0000001-0000-0000-0000-000000000002', name: 'Diya Elite', phone: '9000000002', email: 'diya.elite+test@grsc.dev', created_at: daysAgo(120), address_line1: null, address_line2: null, city: null, state: null, zip_code: null },
     membership: { membership_id: 'mem-elite', tier: 'elite', status: 'Active', free_coffee_balance: 5, allowance_starts_at: daysAgo(15), allowance_ends_at: daysFromNow(350), daily_coffee_start_date: daysAgo(2) },
     wallet: { cashback_balance: 500.00, potential_cashback_balance: 120.00, cashback_lifetime_earned: 2400.00 },
     recent_transactions: diyaTransactions,
@@ -78,7 +78,7 @@ const TEST_PROFILES: Record<string, CustomerProfile> = {
   // Vikram — Legend Active, top tier
   '9000000003': {
     success: true,
-    customer: { id: 'a0000001-0000-0000-0000-000000000003', name: 'Vikram Legend', phone: '9000000003', email: 'vikram.legend+test@grsc.dev', created_at: daysAgo(200) },
+    customer: { id: 'a0000001-0000-0000-0000-000000000003', name: 'Vikram Legend', phone: '9000000003', email: 'vikram.legend+test@grsc.dev', created_at: daysAgo(200), address_line1: null, address_line2: null, city: null, state: null, zip_code: null },
     membership: { membership_id: 'mem-legend', tier: 'legend', status: 'Active', free_coffee_balance: 99, allowance_starts_at: daysAgo(60), allowance_ends_at: daysFromNow(305), daily_coffee_start_date: daysAgo(10) },
     wallet: { cashback_balance: 1500.00, potential_cashback_balance: 300.00, cashback_lifetime_earned: 8800.00 },
     recent_transactions: vikramTransactions,
@@ -86,7 +86,7 @@ const TEST_PROFILES: Record<string, CustomerProfile> = {
   // Priya — Pro Expired
   '9000000004': {
     success: true,
-    customer: { id: 'a0000001-0000-0000-0000-000000000004', name: 'Priya Expired', phone: '9000000004', email: 'priya.expired+test@grsc.dev', created_at: daysAgo(420) },
+    customer: { id: 'a0000001-0000-0000-0000-000000000004', name: 'Priya Expired', phone: '9000000004', email: 'priya.expired+test@grsc.dev', created_at: daysAgo(420), address_line1: null, address_line2: null, city: null, state: null, zip_code: null },
     membership: { membership_id: 'mem-expired', tier: 'pro', status: 'Expired', free_coffee_balance: 0, allowance_starts_at: daysAgo(400), allowance_ends_at: daysAgo(10), daily_coffee_start_date: daysAgo(40) },
     wallet: { cashback_balance: 75.00, potential_cashback_balance: 0.00, cashback_lifetime_earned: 320.00 },
     recent_transactions: priyaTransactions,
@@ -94,7 +94,7 @@ const TEST_PROFILES: Record<string, CustomerProfile> = {
   // Rohan — Non-member
   '9000000005': {
     success: true,
-    customer: { id: 'a0000001-0000-0000-0000-000000000005', name: 'Rohan NonMember', phone: '9000000005', email: 'rohan.free+test@grsc.dev', created_at: daysAgo(7) },
+    customer: { id: 'a0000001-0000-0000-0000-000000000005', name: 'Rohan NonMember', phone: '9000000005', email: 'rohan.free+test@grsc.dev', created_at: daysAgo(7), address_line1: null, address_line2: null, city: null, state: null, zip_code: null },
     membership: null,
     wallet: { cashback_balance: 0, potential_cashback_balance: 0, cashback_lifetime_earned: 0 },
     recent_transactions: [],

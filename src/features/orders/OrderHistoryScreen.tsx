@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom'
 import { Package, Utensils, Truck } from 'lucide-react'
 import { toast } from 'sonner'
 import { ScreenHeader } from '../../components/ScreenHeader'
-import { useCustomerOrders, useCustomerProfile } from '../../hooks/useCustomerProfile'
+import { useCustomerOrdersInfinite, useCustomerProfile } from '../../hooks/useCustomerProfile'
 import { ActiveOrderTracker } from './ActiveOrderTracker'
 import { OrderDetailSheet } from './OrderDetailSheet'
 import { QuickReorderRow } from '../reorder/QuickReorderRow'
@@ -35,6 +35,8 @@ const ACTIVE_STATUSES = new Set([
 ])
 
 const DONE_STATUSES = new Set(['delivered', 'completed', 'done'])
+
+const TERMINAL_STATUSES = new Set(['delivered', 'completed', 'done', 'cancelled', 'cancelled_payment_failed'])
 
 function normalizeStatus(status: string | null | undefined): string {
   return (status ?? '').toLowerCase().replace(/\s+/g, '_')
@@ -150,20 +152,33 @@ export function OrderHistoryScreen() {
   const [searchParams] = useSearchParams()
   const { open: openCashfree } = useCashfree()
 
-  const [page, setPage] = useState(1)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
-  const { data, isLoading, error } = useCustomerOrders(page)
+  const {
+    data,
+    isLoading,
+    error,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useCustomerOrdersInfinite()
   const { data: profile } = useCustomerProfile()
 
-  const orders = data?.orders || []
+  const orders = data?.pages.flatMap(p => p.orders) ?? []
   const activeOrders = orders.filter(o => ACTIVE_STATUSES.has(normalizeStatus(o.status)))
   const pastOrders = orders.filter(o => !ACTIVE_STATUSES.has(normalizeStatus(o.status)))
 
   const UUID_RE = /^[0-9a-f-]{36}$/
   const activeParam = searchParams.get('active')
-  const activeOrderIds = activeParam
+  const ordersById = new Map(orders.map(o => [o.id, o]))
+  const activeOrderIds = (activeParam
     ? activeParam.split(',').map(id => id.trim()).filter(id => UUID_RE.test(id))
     : []
+  ).filter(id => {
+    // Drop URL-pinned active ids whose order is now terminal (cancelled/delivered).
+    // The order may not yet be in `orders` (just-placed) — keep showing in that case.
+    const o = ordersById.get(id)
+    return !o || !TERMINAL_STATUSES.has(normalizeStatus(o.status))
+  })
 
   const hasActiveSection = activeOrderIds.length > 0 || activeOrders.length > 0
   // Wallet is the source of truth for current cashback balance — summing
@@ -313,12 +328,20 @@ export function OrderHistoryScreen() {
               ))}
             </div>
 
-            {data?.hasMore && (
+            {hasNextPage && (
               <button
-                onClick={() => setPage(p => p + 1)}
-                className="w-full mt-3 py-2 border border-[var(--card)] rounded-lg text-sm text-[var(--text-secondary)]"
+                onClick={() => fetchNextPage()}
+                disabled={isFetchingNextPage}
+                className="w-full mt-3 py-2 border border-[var(--card)] rounded-lg text-sm text-[var(--text-secondary)] disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                Load More
+                {isFetchingNextPage ? (
+                  <>
+                    <span className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-[var(--text-secondary)] border-t-transparent" />
+                    Loading…
+                  </>
+                ) : (
+                  'Load More'
+                )}
               </button>
             )}
           </div>

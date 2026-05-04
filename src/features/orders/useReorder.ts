@@ -53,6 +53,7 @@ export function useReorder(targetOrder?: Order) {
         productCode: item.petpooja_item_id,
         name: menuProduct.name,
         price: menuProduct.price,
+        imageUrl: menuProduct.image_url ?? null,
         quantity: item.quantity,
         addons: resolvedAddons,
         specialInstructions: '',
