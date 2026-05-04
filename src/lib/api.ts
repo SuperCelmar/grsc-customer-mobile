@@ -7,10 +7,12 @@ function isDevMock(): boolean {
   try { return import.meta.env.DEV && sessionStorage.getItem('grsc_dev_session') === '1' } catch { return false }
 }
 
+const DEFAULT_TIMEOUT_MS = 30_000
+
 async function callFunction<T>(
   name: string,
   body?: unknown,
-  options?: { method?: string; noAuth?: boolean; omitSourceHeader?: boolean }
+  options?: { method?: string; noAuth?: boolean; omitSourceHeader?: boolean; timeoutMs?: number }
 ): Promise<T> {
   const session = (await supabase.auth.getSession()).data.session
 
@@ -51,11 +53,28 @@ async function callFunction<T>(
   if (!session?.access_token && isDevMock() && name === 'cashfree-order-create') {
     headers['x-dev-phone'] = getActiveTestPhone()
   }
-  const response = await fetch(`${FUNCTIONS_URL}/${name}`, {
-    method: options?.method || 'POST',
-    headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  })
+  const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  let response: Response
+  try {
+    response = await fetch(`${FUNCTIONS_URL}/${name}`, {
+      method: options?.method || 'POST',
+      headers,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+      signal: controller.signal,
+    })
+  } catch (err) {
+    if ((err as { name?: string })?.name === 'AbortError') {
+      throw Object.assign(
+        new Error('The request is taking longer than expected. Please check Orders to confirm — your order may have gone through.'),
+        { code: 'TIMEOUT' }
+      )
+    }
+    throw err
+  } finally {
+    clearTimeout(timer)
+  }
   const data = await response.json()
   if (!response.ok || data.success === false) {
     const msg = data.error || 'Request failed'
