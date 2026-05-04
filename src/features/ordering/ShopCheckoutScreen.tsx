@@ -6,6 +6,7 @@ import { useCart } from '../../contexts/CartContext'
 import { useCustomerProfile } from '../../hooks/useCustomerProfile'
 import { api } from '../../lib/api'
 import { useRazorpay } from './useRazorpay'
+import { OrderProcessingOverlay } from './OrderProcessingOverlay'
 import { getMissingCheckoutFields } from './checkoutValidation'
 
 export function ShopCheckoutScreen() {
@@ -114,13 +115,21 @@ export function ShopCheckoutScreen() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--muted)] max-w-[430px] mx-auto flex flex-col">
+    <div className="relative min-h-screen bg-[var(--muted)] max-w-[430px] mx-auto flex flex-col">
       <ScreenHeader
         title="Checkout"
         onBack={handleBack}
       />
 
-      <div className="flex-1 overflow-y-auto pb-28 px-4 py-4 space-y-4">
+      {loading && (
+        <OrderProcessingOverlay
+          intent="online-payment"
+          totalLabel={`₹${subtotalRupees.toFixed(0)}+ checkout`}
+          className="absolute inset-0"
+        />
+      )}
+
+      <div className={`flex-1 overflow-y-auto pb-28 px-4 py-4 space-y-4 ${loading ? 'pointer-events-none opacity-60' : ''}`}>
         <div className="bg-white rounded-lg border border-[var(--card)] p-3 space-y-3">
           <h2 className="text-sm font-semibold text-[var(--text)]">Order Items</h2>
           {shopCart.map(item => (

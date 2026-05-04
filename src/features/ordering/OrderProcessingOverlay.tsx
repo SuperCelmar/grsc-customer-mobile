@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react'
+
 type ProcessingIntent = 'cash-order' | 'online-payment' | 'mixed-cash' | 'mixed-online'
 
 type Props = {
@@ -5,6 +7,8 @@ type Props = {
   totalLabel?: string
   className?: string
 }
+
+const SLOW_HINT_AFTER_MS = 12000
 
 const COPY: Record<ProcessingIntent, { title: string; body: string; steps: string[] }> = {
   'cash-order': {
@@ -31,6 +35,12 @@ const COPY: Record<ProcessingIntent, { title: string; body: string; steps: strin
 
 export function OrderProcessingOverlay({ intent, totalLabel, className = '' }: Props) {
   const copy = COPY[intent]
+  const [showSlowHint, setShowSlowHint] = useState(false)
+
+  useEffect(() => {
+    const timer = setTimeout(() => setShowSlowHint(true), SLOW_HINT_AFTER_MS)
+    return () => clearTimeout(timer)
+  }, [])
 
   return (
     <div
@@ -69,6 +79,12 @@ export function OrderProcessingOverlay({ intent, totalLabel, className = '' }: P
             </div>
           ))}
         </div>
+
+        {showSlowHint && (
+          <p className="text-xs leading-5 text-[var(--text-secondary)] mt-7 max-w-[300px]">
+            Taking longer than usual? Stay on this screen — we'll retry automatically. Don't refresh.
+          </p>
+        )}
       </div>
     </div>
   )

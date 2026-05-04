@@ -81,29 +81,30 @@ export function VariantPickerSheet({ product, onClose, onViewCart }: Props) {
       <div className="relative bg-white rounded-t-2xl max-h-[92vh] flex flex-col overflow-hidden">
         {/* Hero */}
         <div
-          className="relative flex-shrink-0 flex items-center justify-center"
+          className="relative flex-shrink-0 flex items-center justify-center overflow-hidden"
           style={{ height: 240, backgroundColor: 'var(--muted)' }}
         >
-          {product.image_url ? (
+          <span
+            className="select-none"
+            style={{
+              fontFamily: 'serif',
+              fontSize: 72,
+              fontWeight: 600,
+              color: 'var(--primary)',
+              letterSpacing: '-0.02em',
+            }}
+          >
+            GR
+          </span>
+          {product.image_url && (
             <img
               src={product.image_url}
               alt={product.name}
               loading="lazy"
-              className="w-full h-full object-cover"
+              decoding="async"
+              className="absolute inset-0 w-full h-full object-cover"
+              onError={(e) => { e.currentTarget.style.display = 'none' }}
             />
-          ) : (
-            <span
-              className="select-none"
-              style={{
-                fontFamily: 'serif',
-                fontSize: 72,
-                fontWeight: 600,
-                color: 'var(--primary)',
-                letterSpacing: '-0.02em',
-              }}
-            >
-              GR
-            </span>
           )}
           {onViewCart && cartCount > 0 && (
             <button
