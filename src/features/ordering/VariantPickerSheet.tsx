@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { ShoppingBag } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { useCart } from '../../contexts/CartContext'
+import { useSubscription } from '../subscriptions/useSubscription'
 import type { CartSubscription } from '../../contexts/CartContext'
 import type { StoreMenu } from '../../lib/api'
 
@@ -17,6 +19,11 @@ type Props = {
 
 export function VariantPickerSheet({ product, onClose, onViewCart }: Props) {
   const { addShopItem, cartCount } = useCart()
+  const navigate = useNavigate()
+  const subscription = useSubscription()
+
+  const isSubscribedToThis = subscription?.status === 'active' && subscription.productId === product.id
+  const isActiveSubscriber = subscription?.status === 'active'
 
   const firstInStock = product.variants.find(v => v.stock_status === 'instock') ?? null
 
@@ -24,7 +31,9 @@ export function VariantPickerSheet({ product, onClose, onViewCart }: Props) {
     firstInStock?.variant_id ?? null
   )
   const [quantity, setQuantity] = useState(1)
-  const [purchaseType, setPurchaseType] = useState<PurchaseType>('one-time')
+  const [purchaseType, setPurchaseType] = useState<PurchaseType>(
+    isSubscribedToThis ? (subscription?.frequency === 'monthly' ? 'monthly' : 'biweekly') : 'one-time'
+  )
 
   const selectedVariant: Variant | undefined = product.variants.find(
     v => v.variant_id === selectedVariantId
@@ -186,6 +195,46 @@ export function VariantPickerSheet({ product, onClose, onViewCart }: Props) {
               })}
             </div>
           </div>
+
+          {isSubscribedToThis && (
+            <div
+              className="px-3 py-2.5 rounded-lg border text-sm"
+              style={{ borderColor: '#D4A574', backgroundColor: '#FDF8F3' }}
+            >
+              <p className="font-medium text-[#1A1410]">
+                You&apos;re subscribed to this bean
+              </p>
+              <p className="text-xs text-[#6B6560] mt-0.5">
+                Shipments every {subscription?.frequency === 'monthly' ? 'month' : '2 weeks'}
+              </p>
+              <button
+                type="button"
+                onClick={() => { onClose(); navigate('/subscriptions') }}
+                className="text-xs font-medium mt-1.5"
+                style={{ color: '#D4A574' }}
+              >
+                Manage subscription →
+              </button>
+            </div>
+          )}
+
+          {!isSubscribedToThis && isActiveSubscriber && product.subscription_eligible && (
+            <div
+              className="px-3 py-2 rounded-lg border text-sm"
+              style={{ borderColor: '#E8DDD0', backgroundColor: '#F5EFE9' }}
+            >
+              <p className="text-xs text-[#6B6560]">
+                Swap your subscription to this bean
+              </p>
+              <span
+                className="text-xs font-medium"
+                style={{ color: '#A09A96' }}
+                title="Coming in v1.1"
+              >
+                Coming in v1.1
+              </span>
+            </div>
+          )}
 
           {product.subscription_eligible && selectedVariant && (
             <div>

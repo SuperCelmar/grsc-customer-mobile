@@ -9,6 +9,7 @@ import { VariantPickerSheet } from './VariantPickerSheet'
 import { CartDrawer } from './CartDrawer'
 import { FloatingCartButton } from './FloatingCartButton'
 import { getCategoryIcon } from '../../assets/category-icons'
+import { useSubscription } from '../subscriptions/useSubscription'
 import type { CategoryIcon } from '../../assets/category-icons'
 import type { StoreMenu } from '../../lib/api'
 
@@ -66,6 +67,7 @@ function ProductCard({
   onCardClick,
   onAddClick,
   disabled,
+  inYourSub,
 }: {
   name: string
   priceLabel: string
@@ -73,6 +75,7 @@ function ProductCard({
   onCardClick: () => void
   onAddClick: () => void
   disabled?: boolean
+  inYourSub?: boolean
 }) {
   return (
     <div
@@ -110,6 +113,20 @@ function ProductCard({
               style={{ borderRadius: 6 }}
               onError={(e) => { e.currentTarget.style.display = 'none' }}
             />
+          )}
+          {inYourSub && (
+            <span
+              className="absolute top-2 right-2 text-white font-medium"
+              style={{
+                fontSize: 11,
+                lineHeight: 1,
+                borderRadius: 4,
+                padding: '3px 7px',
+                backgroundColor: '#D4A574',
+              }}
+            >
+              IN YOUR SUB
+            </span>
           )}
         </div>
         <div className="px-2.5 pt-2 pb-2.5">
@@ -158,6 +175,8 @@ function MenuBrowseInner() {
   const { data: menuData, isLoading: menuLoading, error: menuError } = useStoreMenu(storeInfo?.storeId || '')
   const { data: storeStatus } = useStoreStatus(storeInfo?.petpoojaRestaurantId || '')
   const { cartCount, addItem } = useCart()
+  const subscription = useSubscription()
+  const subscribedProductId = subscription?.status === 'active' ? subscription.productId : null
   const [searchParams] = useSearchParams()
   const applied = useRef(false)
 
@@ -412,6 +431,7 @@ function MenuBrowseInner() {
                 onCardClick={() => handleCafeCardClick(product)}
                 onAddClick={() => handleCafeAddClick(product)}
                 disabled={!isOpen}
+                inYourSub={subscribedProductId === product.id}
               />
             ))}
 
@@ -428,6 +448,7 @@ function MenuBrowseInner() {
                   imageUrl={product.image_url}
                   onCardClick={() => setSelectedOnlineProduct(product)}
                   onAddClick={() => setSelectedOnlineProduct(product)}
+                  inYourSub={subscribedProductId === product.id}
                 />
               )
             })}
