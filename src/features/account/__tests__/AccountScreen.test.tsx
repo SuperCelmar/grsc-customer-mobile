@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { AccountScreen } from '../AccountScreen'
 import type { AccountProfile } from '../types'
 
@@ -18,6 +19,10 @@ vi.mock('../../../lib/supabase', () => ({
 
 vi.mock('../../../lib/api', () => ({
   api: {},
+}))
+
+vi.mock('../../../lib/config', () => ({
+  SUPPORT_WHATSAPP_E164: '919876543210',
 }))
 
 vi.mock('lucide-react', () => ({
@@ -99,16 +104,8 @@ vi.mock('../CashbackStrip', () => ({
   CashbackStrip: () => <div data-testid="cashback-strip" />,
 }))
 
-vi.mock('../PaymentsAccordion', () => ({
-  PaymentsAccordion: () => <div data-testid="payments-accordion" />,
-}))
-
 vi.mock('../ReferralAccordion', () => ({
   ReferralAccordion: () => <div data-testid="referral-accordion" />,
-}))
-
-vi.mock('../SettingsAccordion', () => ({
-  SettingsAccordion: () => <div data-testid="settings-accordion" />,
 }))
 
 beforeEach(() => {
@@ -161,20 +158,49 @@ describe('AccountScreen', () => {
     expect(screen.getByTestId('tier-hero')).toHaveTextContent('TierComparisonView')
   })
 
-  it('renders all section accordions', () => {
+  it('renders the account hub summary region', () => {
     render(<AccountScreen />)
-    expect(screen.getByTestId('subscription-accordion')).toBeInTheDocument()
+
+    expect(screen.getByRole('region', { name: /account summary/i })).toBeInTheDocument()
     expect(screen.getByTestId('cashback-strip')).toBeInTheDocument()
-    expect(screen.getByTestId('address-card')).toBeInTheDocument()
-    expect(screen.getByTestId('payments-accordion')).toBeInTheDocument()
-    expect(screen.getByTestId('referral-accordion')).toBeInTheDocument()
-    expect(screen.getByTestId('settings-accordion')).toBeInTheDocument()
+  })
+
+  it('links the subscriptions quick action to the subscriptions route', () => {
+    render(<AccountScreen />)
+
+    expect(screen.getByRole('link', { name: /subscriptions/i })).toHaveAttribute('href', '/subscriptions')
+  })
+
+  it('surfaces payment support and settings without unsupported card management claims', async () => {
+    const user = userEvent.setup()
+    render(<AccountScreen />)
+
+    const paymentToggle = screen.queryByRole('button', { name: /payment methods/i })
+    if (paymentToggle) {
+      await user.click(paymentToggle)
+    }
+
+    expect(screen.getByText(/Payment methods/i)).toBeInTheDocument()
+    expect(screen.getByText(/cards are tokeni[sz]ed/i)).toBeInTheDocument()
+    expect(screen.getByText(/don't store cards in-app/i)).toBeInTheDocument()
+
+    const settingsToggle = screen.queryByRole('button', { name: /settings.*support/i })
+    if (settingsToggle) {
+      await user.click(settingsToggle)
+    }
+
+    expect(screen.getByText(/Contact support/i)).toBeInTheDocument()
+    expect(screen.getByText(/Notification preferences/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /manage cards/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /add card|edit card|update card/i })).not.toBeInTheDocument()
   })
 
   it('renders address from profile when present', () => {
     render(<AccountScreen />)
+    expect(screen.getByText(/Delivery Address/i)).toBeInTheDocument()
     expect(screen.getByText(/123 Main St/)).toBeInTheDocument()
     expect(screen.getByText(/Hyderabad, Telangana - 500001/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /edit address|manage address/i })).not.toBeInTheDocument()
   })
 
   it('renders empty-state copy when profile has no address', () => {
@@ -184,5 +210,6 @@ describe('AccountScreen', () => {
     }
     render(<AccountScreen />)
     expect(screen.getByText(/No address on file/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /edit address|manage address/i })).not.toBeInTheDocument()
   })
 })
