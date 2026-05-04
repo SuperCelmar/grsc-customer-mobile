@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom'
 import { Package, Utensils, Truck } from 'lucide-react'
 import { toast } from 'sonner'
 import { ScreenHeader } from '../../components/ScreenHeader'
-import { useCustomerOrders, useCustomerProfile } from '../../hooks/useCustomerProfile'
+import { useCustomerOrdersInfinite, useCustomerProfile } from '../../hooks/useCustomerProfile'
 import { ActiveOrderTracker } from './ActiveOrderTracker'
 import { OrderDetailSheet } from './OrderDetailSheet'
 import { QuickReorderRow } from '../reorder/QuickReorderRow'
@@ -152,12 +152,18 @@ export function OrderHistoryScreen() {
   const [searchParams] = useSearchParams()
   const { open: openCashfree } = useCashfree()
 
-  const [page, setPage] = useState(1)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
-  const { data, isLoading, error } = useCustomerOrders(page)
+  const {
+    data,
+    isLoading,
+    error,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useCustomerOrdersInfinite()
   const { data: profile } = useCustomerProfile()
 
-  const orders = data?.orders || []
+  const orders = data?.pages.flatMap(p => p.orders) ?? []
   const activeOrders = orders.filter(o => ACTIVE_STATUSES.has(normalizeStatus(o.status)))
   const pastOrders = orders.filter(o => !ACTIVE_STATUSES.has(normalizeStatus(o.status)))
 
@@ -322,12 +328,20 @@ export function OrderHistoryScreen() {
               ))}
             </div>
 
-            {data?.hasMore && (
+            {hasNextPage && (
               <button
-                onClick={() => setPage(p => p + 1)}
-                className="w-full mt-3 py-2 border border-[var(--card)] rounded-lg text-sm text-[var(--text-secondary)]"
+                onClick={() => fetchNextPage()}
+                disabled={isFetchingNextPage}
+                className="w-full mt-3 py-2 border border-[var(--card)] rounded-lg text-sm text-[var(--text-secondary)] disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                Load More
+                {isFetchingNextPage ? (
+                  <>
+                    <span className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-[var(--text-secondary)] border-t-transparent" />
+                    Loading…
+                  </>
+                ) : (
+                  'Load More'
+                )}
               </button>
             )}
           </div>
