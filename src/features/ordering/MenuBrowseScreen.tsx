@@ -9,11 +9,19 @@ import { VariantPickerSheet } from './VariantPickerSheet'
 import { CartDrawer } from './CartDrawer'
 import { FloatingCartButton } from './FloatingCartButton'
 import { getCategoryIcon } from '../../assets/category-icons'
+import { ProductImage } from '../../components/ProductImage'
+import { useMenuImageWarmup } from '../../hooks/useMenuImageWarmup'
 import type { CategoryIcon } from '../../assets/category-icons'
 import type { StoreMenu } from '../../lib/api'
 
 type Product = StoreMenu['products'][number]
 type OnlineProduct = StoreMenu['online_products'][number]
+
+function createCartItemId() {
+  return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `cart_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
+}
 
 function CategoryPill({
   label,
@@ -66,6 +74,7 @@ function ProductCard({
   onCardClick,
   onAddClick,
   disabled,
+  priority,
 }: {
   name: string
   priceLabel: string
@@ -73,6 +82,7 @@ function ProductCard({
   onCardClick: () => void
   onAddClick: () => void
   disabled?: boolean
+  priority?: boolean
 }) {
   return (
     <div
@@ -86,30 +96,17 @@ function ProductCard({
         className="block w-full text-left disabled:opacity-60"
       >
         <div
-          className="aspect-square w-full flex items-center justify-center"
+          className="relative aspect-square w-full flex items-center justify-center overflow-hidden"
           style={{ backgroundColor: 'var(--muted)', borderRadius: 6 }}
         >
-          {imageUrl ? (
-            <img
-              src={imageUrl}
-              alt={name}
-              loading="lazy"
-              className="w-full h-full object-cover"
-              style={{ borderRadius: 6 }}
-            />
-          ) : (
-            <span
-              className="font-semibold"
-              style={{
-                fontFamily: 'serif',
-                color: 'var(--primary)',
-                fontSize: 28,
-                letterSpacing: 1,
-              }}
-            >
-              GR
-            </span>
-          )}
+          <ProductImage
+            src={imageUrl}
+            alt={name}
+            fill
+            className="absolute inset-0 h-full w-full"
+            loading={priority ? 'eager' : 'lazy'}
+            fetchPriority={priority ? 'high' : 'auto'}
+          />
         </div>
         <div className="px-2.5 pt-2 pb-2.5">
           <p
@@ -156,6 +153,7 @@ function MenuBrowseInner() {
   const { storeInfo, storeLoading } = useOrdering()
   const { data: menuData, isLoading: menuLoading, error: menuError } = useStoreMenu(storeInfo?.storeId || '')
   const { data: storeStatus } = useStoreStatus(storeInfo?.petpoojaRestaurantId || '')
+  useMenuImageWarmup(menuData)
   const { cartCount, addItem } = useCart()
   const [searchParams] = useSearchParams()
   const applied = useRef(false)
@@ -298,12 +296,8 @@ function MenuBrowseInner() {
     }
     // Simple quick-add: no addons
     const wasEmpty = cartCount === 0
-    const cartItemId =
-      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-        ? crypto.randomUUID()
-        : `cart_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
     addItem({
-      cartItemId,
+      cartItemId: createCartItemId(),
       productId: product.id,
       productCode: product.id,
       name: product.name,
@@ -401,19 +395,20 @@ function MenuBrowseInner() {
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-3">
-            {filteredCafe.map(product => (
+            {filteredCafe.map((product, index) => (
               <ProductCard
                 key={product.id}
                 name={product.name}
                 priceLabel={`₹${product.price}`}
-                imageUrl={null}
+                imageUrl={product.image_url ?? null}
                 onCardClick={() => handleCafeCardClick(product)}
                 onAddClick={() => handleCafeAddClick(product)}
                 disabled={!isOpen}
+                priority={index < 4}
               />
             ))}
 
-            {filteredOnline.map(product => {
+            {filteredOnline.map((product, index) => {
               const lowestPricePaise = product.variants.reduce(
                 (min, v) => (v.price_paise < min ? v.price_paise : min),
                 product.variants[0]?.price_paise ?? 0
@@ -426,6 +421,7 @@ function MenuBrowseInner() {
                   imageUrl={product.image_url}
                   onCardClick={() => setSelectedOnlineProduct(product)}
                   onAddClick={() => setSelectedOnlineProduct(product)}
+                  priority={filteredCafe.length + index < 4}
                 />
               )
             })}

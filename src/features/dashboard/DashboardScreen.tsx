@@ -2,6 +2,7 @@ import { useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { useCustomerProfile, useStoreMenu, useStoreStatus } from '../../hooks/useCustomerProfile'
+import { useMenuImageWarmup } from '../../hooks/useMenuImageWarmup'
 import { OrderingProvider, useOrdering } from '../ordering/OrderingContext'
 import { TransactionList } from './TransactionList'
 import { HomeHeader } from './HomeHeader'
@@ -58,9 +59,10 @@ function DashboardInner() {
   const qc = useQueryClient()
 
   const { data: profileData, isLoading: profileLoading, isError: profileError } = useCustomerProfile()
-  const { storeInfo, storeLoading: _storeLoading } = useOrdering()
+  const { storeInfo } = useOrdering()
   const { data: menuData } = useStoreMenu(storeInfo?.storeId || '')
   const { data: storeStatus } = useStoreStatus(storeInfo?.petpoojaRestaurantId || '')
+  useMenuImageWarmup(menuData)
 
   // Pull-to-refresh
   const touchStartY = useRef(0)

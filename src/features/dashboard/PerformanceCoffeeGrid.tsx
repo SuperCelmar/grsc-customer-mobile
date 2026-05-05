@@ -1,4 +1,5 @@
 import { Plus, Truck } from 'lucide-react'
+import { ProductImage } from '../../components/ProductImage'
 import type { StoreMenu } from '../../lib/api'
 
 type OnlineProduct = StoreMenu['online_products'][number]
@@ -17,7 +18,7 @@ export function PerformanceCoffeeGrid({ products, onSelect, onQuickAdd }: Props)
   return (
     <div className="px-4">
       <div className="grid grid-cols-2 gap-4">
-        {items.map(product => {
+        {items.map((product, index) => {
           const minPricePaise = product.variants.length > 0
             ? Math.min(...product.variants.map(v => v.price_paise))
             : 0
@@ -42,16 +43,14 @@ export function PerformanceCoffeeGrid({ products, onSelect, onQuickAdd }: Props)
                 <span className="text-[10px] font-bold uppercase tracking-widest text-white">Ships 2-3 days</span>
               </div>
               <div className="relative mb-2">
-                {product.image_url ? (
-                  <img
-                    src={product.image_url}
-                    alt={product.name}
-                    loading="lazy"
-                    className="aspect-square w-full rounded object-cover"
-                  />
-                ) : (
-                  <div className="aspect-square w-full rounded bg-muted" />
-                )}
+                <ProductImage
+                  src={product.image_url}
+                  alt={product.name}
+                  fill
+                  className="aspect-square w-full rounded"
+                  loading={index < 2 ? 'eager' : 'lazy'}
+                  fetchPriority={index < 2 ? 'high' : 'auto'}
+                />
                 <button
                   type="button"
                   aria-label={`Add ${product.name} to cart`}

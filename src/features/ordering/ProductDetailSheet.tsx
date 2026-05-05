@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { ShoppingBag } from 'lucide-react'
+import { ProductImage } from '../../components/ProductImage'
 import { useCart } from '../../contexts/CartContext'
 import type { StoreMenu } from '../../lib/api'
 
@@ -84,24 +85,20 @@ export function ProductDetailSheet({ product, onClose, onViewCart }: Props) {
     <div className="fixed inset-0 z-[60] flex flex-col justify-end">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="relative bg-white rounded-t-2xl max-h-[92vh] flex flex-col overflow-hidden">
-        {/* Hero: monogram fallback for cafe products (no image_url in cafe menu).
-            When Petpooja image URLs ship, swap this block for an <img>. */}
+        {/* Hero */}
         <div
           className="relative flex-shrink-0 flex items-center justify-center"
           style={{ height: 240, backgroundColor: 'var(--muted)' }}
         >
-          <span
-            className="select-none"
-            style={{
-              fontFamily: 'serif',
-              fontSize: 72,
-              fontWeight: 600,
-              color: 'var(--primary)',
-              letterSpacing: '-0.02em',
-            }}
-          >
-            GR
-          </span>
+          <ProductImage
+            src={product.image_url}
+            alt={product.name}
+            fill
+            className="absolute inset-0 h-full w-full"
+            size={220}
+            loading="eager"
+            fetchPriority="high"
+          />
           {onViewCart && cartCount > 0 && (
             <button
               onClick={() => { onClose(); onViewCart() }}

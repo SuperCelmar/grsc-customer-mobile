@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { ShoppingBag } from 'lucide-react'
+import { ProductImage } from '../../components/ProductImage'
 import { useCart } from '../../contexts/CartContext'
 import type { CartSubscription } from '../../contexts/CartContext'
 import type { StoreMenu } from '../../lib/api'
@@ -84,27 +85,15 @@ export function VariantPickerSheet({ product, onClose, onViewCart }: Props) {
           className="relative flex-shrink-0 flex items-center justify-center"
           style={{ height: 240, backgroundColor: 'var(--muted)' }}
         >
-          {product.image_url ? (
-            <img
-              src={product.image_url}
-              alt={product.name}
-              loading="lazy"
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <span
-              className="select-none"
-              style={{
-                fontFamily: 'serif',
-                fontSize: 72,
-                fontWeight: 600,
-                color: 'var(--primary)',
-                letterSpacing: '-0.02em',
-              }}
-            >
-              GR
-            </span>
-          )}
+          <ProductImage
+            src={product.image_url}
+            alt={product.name}
+            fill
+            className="absolute inset-0 h-full w-full"
+            size={220}
+            loading="eager"
+            fetchPriority="high"
+          />
           {onViewCart && cartCount > 0 && (
             <button
               onClick={() => { onClose(); onViewCart() }}
