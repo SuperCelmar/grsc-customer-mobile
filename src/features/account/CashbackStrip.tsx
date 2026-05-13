@@ -1,16 +1,13 @@
 import { Wallet } from 'lucide-react'
 import type { AccountProfile } from './types'
 
-const TIER_RATE: Record<string, number> = { pro: 5, elite: 10, legend: 15 }
-
 type Props = {
   profile: AccountProfile
 }
 
 export function CashbackStrip({ profile }: Props) {
   const balance = profile.wallet?.cashback_balance ?? null
-  const tier = profile.membership?.tier ?? null
-  const rate = tier ? TIER_RATE[tier] : null
+  const isMember = (profile.allowances ?? []).some(a => a.status === 'Active')
 
   return (
     <div className="mx-4 mt-3 rounded-lg border border-[#E8DDD0] bg-[#FDFCFB] p-4 flex items-center gap-3">
@@ -24,14 +21,12 @@ export function CashbackStrip({ profile }: Props) {
           </p>
           <p className="text-xs text-[#6B6560] mt-0.5">Your cashback</p>
         </div>
-        {rate && tier ? (
-          <div className="text-right shrink-0 pl-3 border-l border-[#E8DDD0]">
-            <p className="text-sm font-semibold text-[#1A1410]">{rate}% tier rate</p>
-            <p className="text-xs text-[#6B6560] mt-0.5">{tier.charAt(0).toUpperCase() + tier.slice(1)} member</p>
-          </div>
-        ) : (
-          <p className="text-xs text-[#6B6560] text-right shrink-0">Earn cashback on every order</p>
-        )}
+        <div className="text-right shrink-0 pl-3 border-l border-[#E8DDD0]">
+          <p className="text-sm font-semibold text-[#1A1410]">10% cashback</p>
+          <p className="text-xs text-[#6B6560] mt-0.5">
+            {isMember ? 'Active member' : 'On every order'}
+          </p>
+        </div>
       </div>
     </div>
   )

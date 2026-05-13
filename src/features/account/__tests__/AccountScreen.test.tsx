@@ -47,10 +47,24 @@ const baseMembership = {
   daily_coffee_start_date: null,
 }
 
+const baseAllowance = {
+  allowance_id: 1,
+  plan_id: 'plan-coffee-30',
+  plan_name: 'Coffee 30',
+  category_id: 'cat-coffee',
+  category_name: 'Classic Coffee',
+  balance: 8,
+  allowance_count: 30,
+  status: 'Active' as const,
+  starts_at: '2026-03-01',
+  ends_at: '2026-06-01',
+}
+
 const baseProfile: AccountProfile = {
   success: true,
   customer: { id: 'c-1', name: 'Celmar', phone: '9876543210', email: null, created_at: '2026-01-01' },
   membership: baseMembership,
+  allowances: [baseAllowance],
   wallet: { cashback_balance: 500, potential_cashback_balance: 0, cashback_lifetime_earned: 1200 },
   recent_transactions: [],
   cashback_balance: 500,
@@ -75,11 +89,14 @@ vi.mock('../../subscriptions/useSubscriptions', () => ({
 }))
 
 vi.mock('../TierHero', () => ({
-  TierHero: ({ profile, firstName }: { profile: { membership: unknown }; firstName?: string | null }) => (
-    <div data-testid="tier-hero" data-firstname={firstName ?? ''}>
-      {profile.membership ? 'MembershipDetailView' : 'TierComparisonView'}
-    </div>
-  ),
+  TierHero: ({ profile, firstName }: { profile: { allowances?: Array<{ status: string }> }; firstName?: string | null }) => {
+    const hasAllowances = (profile.allowances ?? []).some(a => a.status === 'Active')
+    return (
+      <div data-testid="tier-hero" data-firstname={firstName ?? ''}>
+        {hasAllowances ? 'Active plans' : 'No active plan'}
+      </div>
+    )
+  },
 }))
 
 vi.mock('../SubscriptionAccordion', () => ({
@@ -144,16 +161,16 @@ describe('AccountScreen', () => {
     expect(screen.getByTestId('tier-hero')).toHaveAttribute('data-firstname', '')
   })
 
-  it('renders TierHero with active membership', () => {
+  it('renders TierHero with active plan', () => {
     render(<AccountScreen />)
     expect(screen.getByTestId('tier-hero')).toBeInTheDocument()
-    expect(screen.getByTestId('tier-hero')).toHaveTextContent('MembershipDetailView')
+    expect(screen.getByTestId('tier-hero')).toHaveTextContent('Active plans')
   })
 
-  it('renders TierComparisonView for non-member', () => {
-    mockProfile = { ...baseProfile, membership: null }
+  it('renders empty plan state for non-member', () => {
+    mockProfile = { ...baseProfile, membership: null, allowances: [] }
     render(<AccountScreen />)
-    expect(screen.getByTestId('tier-hero')).toHaveTextContent('TierComparisonView')
+    expect(screen.getByTestId('tier-hero')).toHaveTextContent('No active plan')
   })
 
   it('renders all section accordions', () => {

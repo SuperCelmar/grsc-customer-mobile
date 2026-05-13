@@ -1,14 +1,12 @@
 import { Clock, Sparkles } from 'lucide-react'
 import { FreeCoffeeRing } from './FreeCoffeeRing'
-import { TierBadge } from './TierBadge'
+import type { MembershipAllowance } from '../../lib/api'
 
 type Props = {
   variant: 'active' | 'expired' | 'non-member'
-  tier?: 'pro' | 'elite' | 'legend'
-  freeCoffeeBalance?: number
+  allowances?: MembershipAllowance[]
   cashbackBalance?: number
   potentialCashback?: number
-  allowanceEndsAt?: string | null
   onCTA: () => void
 }
 
@@ -21,20 +19,17 @@ function daysUntil(dateStr: string): number {
 
 export function LoyaltyOfferBanner({
   variant,
-  tier,
-  freeCoffeeBalance,
+  allowances,
   cashbackBalance,
   potentialCashback,
-  allowanceEndsAt,
   onCTA,
 }: Props) {
-  const ringColor =
-    tier === 'elite' ? '#C9A961' : tier === 'legend' ? '#D4A574' : '#A0826D'
-  const ringTotal = tier === 'elite' || tier === 'legend' ? 20 : 10
+  const activeAllowances = (allowances ?? []).filter(a => a.status === 'Active')
+  const primary = activeAllowances[0] ?? null
 
   let expiryNode: React.ReactNode = null
-  if (variant === 'active' && allowanceEndsAt) {
-    const days = daysUntil(allowanceEndsAt)
+  if (variant === 'active' && primary?.ends_at) {
+    const days = daysUntil(primary.ends_at)
     if (days <= 0) {
       expiryNode = (
         <p className="text-[11px] font-normal mt-0.5" style={{ color: '#B42C1F' }}>
@@ -52,24 +47,28 @@ export function LoyaltyOfferBanner({
 
   return (
     <div className="mx-4 bg-white rounded-md border border-card p-4 flex flex-col gap-3">
-      {variant === 'active' && (
+      {variant === 'active' && primary && (
         <>
           <div className="flex items-center gap-3">
             <FreeCoffeeRing
-              remaining={freeCoffeeBalance ?? 0}
-              total={ringTotal}
-              color={ringColor}
+              remaining={primary.balance}
+              total={primary.allowance_count}
+              color="#D4A574"
             />
             <div className="flex-1 min-w-0">
               <p className="font-display text-sm font-semibold text-text-dark leading-tight">
-                Your rewards
+                {primary.plan_name}
               </p>
               <p className="text-[11px] font-normal text-text-secondary mt-0.5">
-                {freeCoffeeBalance ?? 0} free coffee(s) · ₹{(cashbackBalance ?? 0).toFixed(2)} cashback
+                {primary.balance} of {primary.allowance_count} {primary.category_name ?? 'items'} · ₹{(cashbackBalance ?? 0).toFixed(2)} cashback
               </p>
               {expiryNode}
+              {activeAllowances.length > 1 && (
+                <p className="text-[11px] font-normal text-text-secondary mt-0.5">
+                  +{activeAllowances.length - 1} more plan{activeAllowances.length - 1 === 1 ? '' : 's'}
+                </p>
+              )}
             </div>
-            <TierBadge tier={tier!} size="sm" />
           </div>
           <button
             type="button"
@@ -108,7 +107,7 @@ export function LoyaltyOfferBanner({
             className="w-full rounded-md py-2.5 text-sm font-semibold text-center active:scale-95 transition-transform duration-100"
             style={{ backgroundColor: '#D4A574', color: '#1A1410' }}
           >
-            Renew your membership
+            Browse plans
           </button>
         </>
       )}
@@ -129,7 +128,7 @@ export function LoyaltyOfferBanner({
               <p className="text-[11px] font-normal text-text-secondary mt-0.5">
                 {potentialCashback && potentialCashback > 0
                   ? `Earn ₹${potentialCashback.toFixed(2)} in cashback waiting`
-                  : 'Join to earn cashback and free coffees.'}
+                  : 'Join to earn 10% cashback and free items.'}
               </p>
             </div>
           </div>
@@ -139,7 +138,7 @@ export function LoyaltyOfferBanner({
             className="w-full rounded-md py-2.5 text-sm font-semibold text-center active:scale-95 transition-transform duration-100"
             style={{ backgroundColor: '#D4A574', color: '#1A1410' }}
           >
-            Become a Pro Member →
+            Browse plans →
           </button>
         </>
       )}

@@ -4,7 +4,6 @@ type Variant = 'active' | 'expired' | 'non-member'
 
 type Props = {
   variant: Variant
-  tier?: 'pro' | 'elite' | 'legend'
   potentialCashback?: number
   onClick: () => void
 }
@@ -12,28 +11,28 @@ type Props = {
 const SLIDES: Record<Variant, string[]> = {
   active: [
     'Fresh Crop — Tiger Blend Now Live',
-    'Member Perk: 10% Off All Beans',
+    'Member Perk: 10% Cashback on Every Order',
     'Earn 2× Points on Hampers',
   ],
   expired: [
     'Come Back to the Gold Standard',
-    'Renew Pro for ₹{cashback} Cashback',
-    "Don't Lose Your 5% Discount",
+    'Renew Your Plan for ₹{cashback} Cashback',
+    "Don't Lose Your Member Perks",
   ],
   'non-member': [
-    'Join the Pro Coffee Circle',
-    'Unlock 5% Off Every Order',
+    'Join the GoldRush Coffee Circle',
+    'Unlock 10% Cashback on Every Order',
     'Taste the GoldRush Lifestyle',
   ],
 }
 
 const SUBTITLES: Record<Variant, string> = {
-  active: 'Exclusive benefits for your {tier} status.',
-  expired: 'Reactivate membership in one tap.',
-  'non-member': 'Start saving with a Pro membership.',
+  active: 'Exclusive benefits for members.',
+  expired: 'Reactivate your plan in one tap.',
+  'non-member': 'Start saving with a membership plan.',
 }
 
-export function HeroBanner({ variant, tier, potentialCashback, onClick }: Props) {
+export function HeroBanner({ variant, potentialCashback, onClick }: Props) {
   const [current, setCurrent] = useState(0)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -47,8 +46,7 @@ export function HeroBanner({ variant, tier, potentialCashback, onClick }: Props)
   }, [])
 
   const headlines = SLIDES[variant]
-  const rawSubtitle = SUBTITLES[variant]
-  const subtitle = rawSubtitle.replace('{tier}', tier ?? 'pro')
+  const subtitle = SUBTITLES[variant]
 
   const headline = headlines[current].replace(
     '{cashback}',

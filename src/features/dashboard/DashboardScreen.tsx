@@ -90,15 +90,17 @@ function DashboardInner() {
     </div>
   )
 
-  const { customer, membership, wallet, recent_transactions } = profileData
+  const { customer, allowances, wallet, recent_transactions } = profileData
 
   const firstName = customer.name?.split(' ')[0] ?? 'there'
-  const isActiveMember = membership?.status === 'Active'
-  const isExpiredMember = membership?.status === 'Expired'
+  const activeAllowances = (allowances ?? []).filter(a => a.status === 'Active')
+  const hasActivePlan = activeAllowances.length > 0
+  const hasExpiredPlan =
+    !hasActivePlan && (allowances ?? []).some(a => a.status === 'Expired' || a.status === 'Exhausted')
 
-  const heroVariant: 'active' | 'expired' | 'non-member' = isActiveMember
+  const heroVariant: 'active' | 'expired' | 'non-member' = hasActivePlan
     ? 'active'
-    : isExpiredMember
+    : hasExpiredPlan
     ? 'expired'
     : 'non-member'
 
@@ -128,7 +130,6 @@ function DashboardInner() {
       <div className="flex flex-col gap-4 pt-2">
         <HeroBanner
           variant={heroVariant}
-          tier={membership?.tier}
           potentialCashback={potentialCashback}
           onClick={() => navigate('/order?category=online-performance-coffee')}
         />
@@ -155,12 +156,10 @@ function DashboardInner() {
 
         <LoyaltyOfferBanner
           variant={heroVariant}
-          tier={membership?.tier}
-          freeCoffeeBalance={membership?.free_coffee_balance}
+          allowances={allowances}
           cashbackBalance={wallet.cashback_balance}
           potentialCashback={wallet.potential_cashback_balance}
-          allowanceEndsAt={membership?.allowance_ends_at ?? null}
-          onCTA={() => navigate('/membership')}
+          onCTA={() => navigate(hasActivePlan ? '/membership' : '/membership/plans')}
         />
 
         <div className="mx-4 bg-white rounded-md border border-card p-4">

@@ -3,6 +3,8 @@ import { PhoneEntryScreen } from './features/auth/PhoneEntryScreen'
 import { OTPVerificationScreen } from './features/auth/OTPVerificationScreen'
 import { DashboardScreen } from './features/dashboard/DashboardScreen'
 import { AccountScreen } from './features/account/AccountScreen'
+import { MembershipScreen } from './features/membership/MembershipScreen'
+import { PlansBrowseScreen } from './features/membership/PlansBrowseScreen'
 import { MenuBrowseScreen } from './features/ordering/MenuBrowseScreen'
 import { ShopCheckoutScreen } from './features/ordering/ShopCheckoutScreen'
 import { UnifiedCheckoutScreen } from './features/ordering/UnifiedCheckoutScreen'
@@ -12,7 +14,6 @@ import { AddressList } from './features/account/AddressList'
 import { ComingSoonScreen } from './features/account/ComingSoonScreen'
 import { ProtectedLayout } from './components/ProtectedLayout'
 import { AppShell } from './components/AppShell'
-import { TierGuard } from './features/auth/TierGuard'
 
 export default function App() {
   return (
@@ -23,11 +24,12 @@ export default function App() {
         <Route element={<ProtectedLayout />}>
           <Route element={<AppShell />}>
             <Route path="/dashboard" element={<DashboardScreen />} />
-            <Route path="/membership" element={<AccountScreen />} />
+            <Route path="/membership" element={<MembershipScreen />} />
+            <Route path="/membership/plans" element={<PlansBrowseScreen />} />
             <Route path="/account" element={<AccountScreen />} />
             <Route path="/order" element={<MenuBrowseScreen />} />
-            <Route path="/checkout" element={<TierGuard require="active-member" fallback="/dashboard"><UnifiedCheckoutScreen /></TierGuard>} />
-            <Route path="/checkout/shop" element={<TierGuard require="active-member" fallback="/dashboard"><ShopCheckoutScreen /></TierGuard>} />
+            <Route path="/checkout" element={<UnifiedCheckoutScreen />} />
+            <Route path="/checkout/shop" element={<ShopCheckoutScreen />} />
             <Route path="/orders" element={<OrderHistoryScreen />} />
             <Route path="/order-confirmation/:orderId" element={<OrderConfirmationScreen />} />
             <Route path="/account/addresses" element={<AddressList />} />

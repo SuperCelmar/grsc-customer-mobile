@@ -62,6 +62,19 @@ async function callFunction<T>(name: string, body?: unknown, options?: { method?
 
 // Exact shapes matching edge function JSON responses
 
+export type MembershipAllowance = {
+  allowance_id: number
+  plan_id: string
+  plan_name: string
+  category_id: string
+  category_name: string | null
+  balance: number
+  allowance_count: number
+  status: 'Active' | 'Exhausted' | 'Expired'
+  starts_at: string | null
+  ends_at: string | null
+}
+
 export type CustomerProfile = {
   success: boolean
   customer: {
@@ -80,6 +93,7 @@ export type CustomerProfile = {
     allowance_ends_at: string | null
     daily_coffee_start_date: string | null
   } | null
+  allowances?: MembershipAllowance[]
   wallet: {
     cashback_balance: number
     potential_cashback_balance: number
@@ -93,6 +107,33 @@ export type CustomerProfile = {
     description: string | null
     date: string
   }>
+}
+
+export type BrowsablePlan = {
+  plan_id: string
+  plan_name: string
+  price: number
+  duration_days: number
+  category_id: string
+  category_name: string | null
+  allowance_count: number
+}
+
+export type MembershipOrderCreateResponse = {
+  ok: true
+  plan_id: string
+  plan_name: string
+  razorpay_order_id: string
+  razorpay_key_id: string
+  amount_paise: number
+  currency: 'INR'
+}
+
+export type MembershipPurchaseResponse = {
+  ok: true
+  membership_id: number
+  allowance_id: number
+  ends_at: string
 }
 
 export type StoreMenu = {
@@ -342,6 +383,29 @@ export const api = {
     callFunction<{ success: boolean; order_id: string; status: string; cashback_awarded?: number }>(
       'razorpay-verify-payment', input
     ),
+
+  // Membership plans — public listing (no auth required) of sellable plans
+  // for the customer-app picker. Backed by `plans-browse` edge function.
+  getMembershipPlans: () =>
+    callFunction<{ ok: true; plans: BrowsablePlan[] }>(
+      'plans-browse',
+      undefined,
+      { method: 'GET', noAuth: true }
+    ),
+
+  // Create a Razorpay Order for a specific plan. Returns the razorpay_order_id
+  // + key + amount that the customer-app passes to Razorpay Checkout.
+  createMembershipOrder: (plan_id: string) =>
+    callFunction<MembershipOrderCreateResponse>('membership-order-create', { plan_id }),
+
+  // Post-Razorpay-success: verify signature server-side and create the
+  // membership allowance row. Stream D handler.
+  purchaseMembership: (input: {
+    plan_id: string
+    razorpay_order_id: string
+    razorpay_payment_id: string
+    razorpay_signature: string
+  }) => callFunction<MembershipPurchaseResponse>('membership-purchase', input),
 
   manageSubscription: (id: string, action: 'pause' | 'resume' | 'cancel', reason?: string) =>
     callFunction<{ success: boolean }>('subscription-manage', { id, action, ...(reason ? { reason } : {}) }),
