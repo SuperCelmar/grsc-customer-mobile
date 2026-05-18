@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, act } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { ActiveOrderTracker } from '../ActiveOrderTracker'
+import { api } from '../../../lib/api'
 
 const mockUnsubscribe = vi.fn()
 const mockSubscribe = vi.fn().mockReturnThis()
@@ -16,6 +18,11 @@ vi.mock('../../../lib/supabase', () => ({
 
 vi.mock('../../../lib/api', () => ({
   api: { cancelOrder: vi.fn() },
+}))
+
+const mockInvalidateQueries = vi.fn()
+vi.mock('@tanstack/react-query', () => ({
+  useQueryClient: () => ({ invalidateQueries: mockInvalidateQueries }),
 }))
 
 const mockFetchOrderWithRetry = vi.fn()
@@ -48,6 +55,7 @@ beforeEach(() => {
   mockOn.mockReturnThis()
   mockSubscribe.mockReturnThis()
   mockFetchOrderWithRetry.mockResolvedValue(null)
+  vi.mocked(api.cancelOrder).mockResolvedValue({ success: true })
 })
 
 describe('ActiveOrderTracker', () => {
@@ -110,6 +118,49 @@ describe('ActiveOrderTracker', () => {
     renderTracker('not-a-uuid')
     expect(screen.getByText(/Couldn't load this order/i)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Cancel/i })).not.toBeInTheDocument()
+  })
+
+  it('cancels from an active tracker without bubbling to the parent card', async () => {
+    const user = userEvent.setup()
+    const parentClick = vi.fn()
+    mockFetchOrderWithRetry
+      .mockResolvedValueOnce(makeOrderData('PLACED'))
+      .mockResolvedValueOnce(makeOrderData('CANCELLED'))
+
+    render(
+      <MemoryRouter>
+        <div onClick={parentClick}>
+          <ActiveOrderTracker orderId={VALID_UUID} />
+        </div>
+      </MemoryRouter>
+    )
+
+    await user.click(await screen.findByRole('button', { name: 'Cancel order' }))
+    expect(parentClick).not.toHaveBeenCalled()
+
+    await user.click(await screen.findByRole('button', { name: 'Yes, cancel' }))
+    expect(api.cancelOrder).toHaveBeenCalledWith(VALID_UUID, 'Customer cancelled from app')
+    expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ['customer-orders'] })
+    expect(await screen.findByText('Order Cancelled')).toBeInTheDocument()
+  })
+
+  it('keeps only one cancel confirmation open across active trackers', async () => {
+    const user = userEvent.setup()
+    mockFetchOrderWithRetry.mockResolvedValue(makeOrderData('PLACED'))
+
+    render(
+      <MemoryRouter>
+        <ActiveOrderTracker orderId={VALID_UUID} />
+        <ActiveOrderTracker orderId="223e4567-e89b-12d3-a456-426614174000" />
+      </MemoryRouter>
+    )
+
+    const buttons = await screen.findAllByRole('button', { name: 'Cancel order' })
+    await user.click(buttons[0])
+    expect(screen.getAllByRole('button', { name: 'Yes, cancel' })).toHaveLength(1)
+
+    await user.click(buttons[1])
+    expect(screen.getAllByRole('button', { name: 'Yes, cancel' })).toHaveLength(1)
   })
 })
 

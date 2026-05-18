@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 
@@ -9,10 +10,10 @@ export type CafeCartItem = {
   productCode: string
   name: string
   price: number
+  imageUrl?: string | null
   quantity: number
   addons: AddonSelection[]
   specialInstructions: string
-  imageUrl?: string | null
 }
 
 function generateCartItemId(): string {
@@ -95,7 +96,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     // Migrate from old single-key storage if present
     const legacy = loadFromStorage<CafeCartItem>('grsc_cart')
     if (legacy.length > 0) {
-      try { localStorage.removeItem('grsc_cart') } catch {}
+      try { localStorage.removeItem('grsc_cart') } catch { void 0 }
       return ensureCartItemIds(legacy)
     }
     return ensureCartItemIds(loadFromStorage<CafeCartItem>(CAFE_KEY))
@@ -106,14 +107,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
     try {
       if (cafeCart.length > 0) localStorage.setItem(CAFE_KEY, JSON.stringify(cafeCart))
       else localStorage.removeItem(CAFE_KEY)
-    } catch {}
+    } catch { void 0 }
   }, [cafeCart])
 
   useEffect(() => {
     try {
       if (shopCart.length > 0) localStorage.setItem(SHOP_KEY, JSON.stringify(shopCart))
       else localStorage.removeItem(SHOP_KEY)
-    } catch {}
+    } catch { void 0 }
   }, [shopCart])
 
   // Cafe actions
@@ -129,7 +130,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       : prev.map(i => i.cartItemId === cartItemId ? { ...i, quantity: qty } : i))
   const clearCafeCart = () => {
     setCafeCart([])
-    try { localStorage.removeItem(CAFE_KEY) } catch {}
+    try { localStorage.removeItem(CAFE_KEY) } catch { void 0 }
   }
 
   // Shop actions
@@ -148,7 +149,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       : prev.map(i => i.variantId === variantId ? { ...i, quantity: qty } : i))
   const clearShopCart = () => {
     setShopCart([])
-    try { localStorage.removeItem(SHOP_KEY) } catch {}
+    try { localStorage.removeItem(SHOP_KEY) } catch { void 0 }
   }
 
   // Counts + subtotals

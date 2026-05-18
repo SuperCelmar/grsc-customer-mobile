@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
@@ -47,7 +48,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sessionStorage.setItem('grsc_dev_session', '1')
       // mock-data.ts uses this to pick the right persona profile
       sessionStorage.setItem('grsc_dev_phone', phone)
-    } catch {}
+    } catch {
+      return
+    }
   }
 
   return <AuthContext.Provider value={{ session, loading, setDevSession }}>{children}</AuthContext.Provider>

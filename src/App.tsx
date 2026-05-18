@@ -10,7 +10,7 @@ import { ShopCheckoutScreen } from './features/ordering/ShopCheckoutScreen'
 import { UnifiedCheckoutScreen } from './features/ordering/UnifiedCheckoutScreen'
 import { OrderConfirmationScreen } from './features/ordering/OrderConfirmationScreen'
 import { OrderHistoryScreen } from './features/orders/OrderHistoryScreen'
-import { AddressList } from './features/account/AddressList'
+import { SubscriptionsScreen } from './features/subscriptions/SubscriptionsScreen'
 import { ComingSoonScreen } from './features/account/ComingSoonScreen'
 import { ProtectedLayout } from './components/ProtectedLayout'
 import { AppShell } from './components/AppShell'
@@ -31,8 +31,8 @@ export default function App() {
             <Route path="/checkout" element={<UnifiedCheckoutScreen />} />
             <Route path="/checkout/shop" element={<ShopCheckoutScreen />} />
             <Route path="/orders" element={<OrderHistoryScreen />} />
+            <Route path="/subscriptions" element={<SubscriptionsScreen />} />
             <Route path="/order-confirmation/:orderId" element={<OrderConfirmationScreen />} />
-            <Route path="/account/addresses" element={<AddressList />} />
             <Route path="/account/notifications" element={<ComingSoonScreen title="Notifications" />} />
           </Route>
         </Route>

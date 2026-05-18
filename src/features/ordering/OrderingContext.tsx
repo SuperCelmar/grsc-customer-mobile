@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, useEffect } from 'react'
 import type { ReactNode } from 'react'
 import { supabase } from '../../lib/supabase'
@@ -22,6 +23,7 @@ export function OrderingProvider({ children }: { children: ReactNode }) {
   const [storeLoading, setStoreLoading] = useState(true)
 
   useEffect(() => {
+    // TODO(multischema-adapt): requires `location` schema in PostgREST exposed_schemas + SELECT RLS on location.stores. Confirm with backend before merging this branch.
     supabase
       .schema('location')
       .from('stores')

@@ -13,7 +13,6 @@ vi.mock('react-router-dom', () => ({
 // ── React Query ──────────────────────────────────────────────────────────────
 const mockInvalidateQueries = vi.fn()
 vi.mock('@tanstack/react-query', () => ({
-  useQuery: () => ({ data: [mockAddress], isLoading: false }),
   useQueryClient: () => ({ invalidateQueries: mockInvalidateQueries }),
 }))
 
@@ -25,11 +24,10 @@ const mockCreateCashfreeCafeOrder = vi.fn()
 
 vi.mock('../../../lib/api', () => ({
   api: {
-    createOnlineOrder: (...args: any[]) => mockCreateOnlineOrder(...args),
-    verifyRazorpayPayment: (...args: any[]) => mockVerifyRazorpayPayment(...args),
-    placeOrder: (...args: any[]) => mockPlaceOrder(...args),
-    createCashfreeCafeOrder: (...args: any[]) => mockCreateCashfreeCafeOrder(...args),
-    listAddresses: vi.fn(),
+    createOnlineOrder: (...args: unknown[]) => mockCreateOnlineOrder(...args),
+    verifyRazorpayPayment: (...args: unknown[]) => mockVerifyRazorpayPayment(...args),
+    placeOrder: (...args: unknown[]) => mockPlaceOrder(...args),
+    createCashfreeCafeOrder: (...args: unknown[]) => mockCreateCashfreeCafeOrder(...args),
   },
 }))
 
@@ -47,13 +45,26 @@ vi.mock('../useCashfree', () => ({
 
 // ── Customer profile / store status (factory — lets tests override storeOpen) ─
 let mockStoreOpen = true
+let mockProfileAddressLine1: string | null = '123 Main St'
 vi.mock('../../../hooks/useCustomerProfile', () => ({
   useCustomerProfile: () => ({
-    data: { customer: { phone: '9999999999', name: 'Test User' } },
+    data: {
+      customer: {
+        id: 'cust-1',
+        phone: '9999999999',
+        name: 'Test User',
+        address_line1: mockProfileAddressLine1,
+        address_line2: null,
+        city: 'Hyderabad',
+        state: 'Telangana',
+        zip_code: '500001',
+      },
+    },
   }),
   useStoreStatus: () => ({
     data: { store_status: mockStoreOpen ? '1' : '0' },
   }),
+  useAvailableRewards: () => ({ data: { rewards: [] }, isLoading: false }),
 }))
 
 // ── OrderingContext ──────────────────────────────────────────────────────────
@@ -67,11 +78,6 @@ vi.mock('../OrderingContext', () => ({
   }),
 }))
 
-// ── AddressBottomSheet (not under test) ──────────────────────────────────────
-vi.mock('../AddressBottomSheet', () => ({
-  AddressBottomSheet: () => null,
-}))
-
 // ── lucide-react ─────────────────────────────────────────────────────────────
 vi.mock('lucide-react', () => ({
   ArrowLeft: () => <span>Back</span>,
@@ -81,17 +87,6 @@ vi.mock('lucide-react', () => ({
 }))
 
 // ── Shared fixtures ──────────────────────────────────────────────────────────
-const mockAddress = {
-  address_id: 'addr-1',
-  label: 'Home',
-  line1: '123 Main St',
-  line2: '',
-  city: 'Hyderabad',
-  state: 'Telangana',
-  pincode: '500001',
-  is_default: true,
-}
-
 const cafeItem: CafeCartItem = {
   cartItemId: 'ci-1',
   productId: 'p-1',
@@ -135,6 +130,20 @@ vi.mock('../../../contexts/CartContext', () => ({
 
 // ── Test helpers ─────────────────────────────────────────────────────────────
 
+type RazorpayMockOptions = {
+  handler: (response: {
+    razorpay_order_id: string
+    razorpay_payment_id: string
+    razorpay_signature: string
+  }) => Promise<void> | void
+  ondismiss?: () => Promise<void> | void
+}
+
+type CashfreeMockOptions = {
+  onSuccess: (orderId: string) => void
+  onFailure: (message: string) => void
+}
+
 function setupRazorpaySuccess(shopOrderId = '11111111-1111-1111-1111-111111111111') {
   mockCreateOnlineOrder.mockResolvedValue({
     razorpay_key_id: 'rzp_test_key',
@@ -145,7 +154,7 @@ function setupRazorpaySuccess(shopOrderId = '11111111-1111-1111-1111-11111111111
     status: 'paid',
     order_id: shopOrderId,
   })
-  mockRazorpayOpen.mockImplementation(async (opts: any) => {
+  mockRazorpayOpen.mockImplementation(async (opts: RazorpayMockOptions) => {
     await opts.handler({
       razorpay_order_id: 'rzp_order_1',
       razorpay_payment_id: 'pay_mock',
@@ -161,6 +170,7 @@ function renderScreen() {
 beforeEach(() => {
   vi.clearAllMocks()
   mockStoreOpen = true
+  mockProfileAddressLine1 = '123 Main St'
   mockCartState = {
     items: [cafeItem],
     cafeCount: 1,
@@ -177,12 +187,12 @@ beforeEach(() => {
 describe('UnifiedCheckoutScreen — happy path', () => {
   it('clears both carts and navigates with both order IDs on full success (ONLINE cafe via Cashfree)', async () => {
     setupRazorpaySuccess('11111111-1111-1111-1111-111111111111')
-    // ONLINE cafe portion goes through Cashfree, not external-order.
+    // ONLINE cafe portion goes through Cashfree, not the COD placement path.
     mockCreateCashfreeCafeOrder.mockResolvedValue({
       order_id: '22222222-2222-2222-2222-222222222222',
       payment_session_id: 'cf_sess_mock',
     })
-    mockCashfreeOpen.mockImplementation(async (opts: any) => {
+    mockCashfreeOpen.mockImplementation(async (opts: CashfreeMockOptions) => {
       opts.onSuccess('22222222-2222-2222-2222-222222222222')
     })
 
@@ -197,6 +207,31 @@ describe('UnifiedCheckoutScreen — happy path', () => {
 
     expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ['customer-orders'] })
     // Cafe (22222...) is primary; shop (11111...) is secondary chip
+    expect(mockNavigate).toHaveBeenCalledWith(
+      '/order-confirmation/22222222-2222-2222-2222-222222222222?secondary=11111111-1111-1111-1111-111111111111'
+    )
+  })
+
+  it('keeps shop online payment on Razorpay and cafe COD on api.placeOrder', async () => {
+    setupRazorpaySuccess('11111111-1111-1111-1111-111111111111')
+    mockPlaceOrder.mockResolvedValue({
+      order_id: '22222222-2222-2222-2222-222222222222',
+    })
+
+    renderScreen()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cash' }))
+    fireEvent.click(screen.getByRole('button', { name: /Pay/i }))
+
+    await waitFor(() => {
+      expect(mockClearCafeCart).toHaveBeenCalledOnce()
+      expect(mockClearShopCart).toHaveBeenCalledOnce()
+    })
+
+    expect(mockCreateOnlineOrder).toHaveBeenCalledOnce()
+    expect(mockVerifyRazorpayPayment).toHaveBeenCalledOnce()
+    expect(mockPlaceOrder).toHaveBeenCalledOnce()
+    expect(mockCreateCashfreeCafeOrder).not.toHaveBeenCalled()
     expect(mockNavigate).toHaveBeenCalledWith(
       '/order-confirmation/22222222-2222-2222-2222-222222222222?secondary=11111111-1111-1111-1111-111111111111'
     )
@@ -236,7 +271,7 @@ describe('UnifiedCheckoutScreen — Razorpay cancel', () => {
       amount_paise: 140000,
     })
     // Simulate user dismissing Razorpay modal via ondismiss
-    mockRazorpayOpen.mockImplementation(async (opts: any) => {
+    mockRazorpayOpen.mockImplementation(async (opts: RazorpayMockOptions) => {
       await opts.ondismiss()
     })
 
@@ -251,6 +286,19 @@ describe('UnifiedCheckoutScreen — Razorpay cancel', () => {
     expect(mockClearCafeCart).not.toHaveBeenCalled()
     expect(mockClearShopCart).not.toHaveBeenCalled()
     expect(mockNavigate).not.toHaveBeenCalled()
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe('UnifiedCheckoutScreen — no profile address', () => {
+  it('shows empty-state copy and disables Pay when profile has no address_line1', () => {
+    mockProfileAddressLine1 = null
+
+    renderScreen()
+
+    expect(screen.getByText(/No address on file/i)).toBeInTheDocument()
+    const payBtn = screen.getByRole('button', { name: /Pay/i })
+    expect(payBtn).toHaveAttribute('aria-disabled', 'true')
   })
 })
 

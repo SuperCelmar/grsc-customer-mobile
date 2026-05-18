@@ -6,16 +6,16 @@ type CheckoutResult = { error?: { message: string }; redirect?: boolean }
 
 function stubCashfree(checkoutResult: CheckoutResult) {
   const checkout = vi.fn().mockResolvedValue(checkoutResult)
-  ;(window as any).Cashfree = vi.fn(() => ({ checkout }))
+  window.Cashfree = vi.fn(() => ({ checkout }))
   return checkout
 }
 
 beforeEach(() => {
-  delete (window as any).Cashfree
+  delete window.Cashfree
 })
 
 afterEach(() => {
-  delete (window as any).Cashfree
+  delete window.Cashfree
 })
 
 describe('useCashfree — real SDK path (dev short-circuit removed)', () => {

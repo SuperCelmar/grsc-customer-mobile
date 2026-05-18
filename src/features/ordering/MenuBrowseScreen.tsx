@@ -216,29 +216,34 @@ function MenuBrowseInner() {
   // Auto-select first category + honor ?category= if valid
   useEffect(() => {
     if (!menuData || applied.current) return
-    applied.current = true
 
-    const validIds = new Set<string>(categories.map(c => c.id))
-    const categoryParam = searchParams.get('category')
-    if (categoryParam && validIds.has(categoryParam)) {
-      setSelectedCategory(categoryParam)
-    } else if (categories.length > 0) {
-      setSelectedCategory(categories[0].id)
-    }
+    const timer = window.setTimeout(() => {
+      if (applied.current) return
+      applied.current = true
 
-    const productParam = searchParams.get('product')
-    if (productParam) {
-      const found = menuData.products.find(p => p.id === productParam)
-      if (found) {
-        setSelectedProduct(found)
-      } else {
-        const onlineProducts = menuData.online_products ?? []
-        const foundOnline = onlineProducts.find(p => p.id === productParam)
-        if (foundOnline) {
-          setSelectedOnlineProduct(foundOnline)
+      const validIds = new Set<string>(categories.map(c => c.id))
+      const categoryParam = searchParams.get('category')
+      if (categoryParam && validIds.has(categoryParam)) {
+        setSelectedCategory(categoryParam)
+      } else if (categories.length > 0) {
+        setSelectedCategory(categories[0].id)
+      }
+
+      const productParam = searchParams.get('product')
+      if (productParam) {
+        const found = menuData.products.find(p => p.id === productParam)
+        if (found) {
+          setSelectedProduct(found)
+        } else {
+          const onlineProducts = menuData.online_products ?? []
+          const foundOnline = onlineProducts.find(p => p.id === productParam)
+          if (foundOnline) {
+            setSelectedOnlineProduct(foundOnline)
+          }
         }
       }
-    }
+    }, 0)
+    return () => window.clearTimeout(timer)
   }, [menuData, categories, searchParams])
 
   if (storeLoading || menuLoading) {
@@ -302,10 +307,10 @@ function MenuBrowseInner() {
       productCode: product.id,
       name: product.name,
       price: product.price,
+      imageUrl: product.image_url ?? null,
       quantity: 1,
       addons: [],
       specialInstructions: '',
-      imageUrl: product.image_url ?? null,
     })
     if (wasEmpty) setCartOpen(true)
   }

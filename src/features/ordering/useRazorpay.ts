@@ -2,8 +2,14 @@ import { useState } from 'react'
 
 declare global {
   interface Window {
-    Razorpay?: any
+    Razorpay?: new (options: RazorpayWidgetOptions) => { open: () => void }
   }
+}
+
+type RazorpayPaymentResponse = {
+  razorpay_order_id: string
+  razorpay_payment_id: string
+  razorpay_signature: string
 }
 
 export type RazorpayOpenOptions = {
@@ -15,12 +21,14 @@ export type RazorpayOpenOptions = {
   description?: string
   prefill?: { name?: string; email?: string; contact?: string }
   theme?: { color?: string }
-  handler: (response: {
-    razorpay_order_id: string
-    razorpay_payment_id: string
-    razorpay_signature: string
-  }) => void
+  handler: (response: RazorpayPaymentResponse) => void
   ondismiss?: () => void
+}
+
+type RazorpayWidgetOptions = RazorpayOpenOptions & {
+  modal: {
+    ondismiss?: () => void
+  }
 }
 
 let scriptPromise: Promise<void> | null = null
@@ -74,8 +82,10 @@ export function useRazorpay(): {
       }
 
       await loadRazorpayScript()
+      const Razorpay = window.Razorpay
+      if (!Razorpay) throw new Error('Razorpay script failed to initialize')
 
-      const rzp = new window.Razorpay({
+      const rzp = new Razorpay({
         key: opts.key,
         order_id: opts.order_id,
         amount: opts.amount,
@@ -91,8 +101,8 @@ export function useRazorpay(): {
       })
 
       rzp.open()
-    } catch (err: any) {
-      setError(err.message || 'Failed to open payment')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to open payment')
     } finally {
       setLoading(false)
     }

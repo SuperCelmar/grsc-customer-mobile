@@ -74,6 +74,7 @@ export default defineConfig(({ mode }) => {
       copySelectedPublicAssets(),
       VitePWA({
         registerType: 'autoUpdate',
+        includeAssets: ['icons/icon-192.svg', 'icons/icon-512.svg'],
         manifest: {
           name: 'GoldRush Coffee',
           short_name: 'GoldRush',
@@ -85,8 +86,8 @@ export default defineConfig(({ mode }) => {
           start_url: '/',
           icons: [
             { src: '/icons/icon-192.svg', sizes: '192x192', type: 'image/svg+xml' },
-            { src: '/icons/icon-512.svg', sizes: '512x512', type: 'image/svg+xml', purpose: 'any maskable' }
-          ]
+            { src: '/icons/icon-512.svg', sizes: '512x512', type: 'image/svg+xml', purpose: 'any maskable' },
+          ],
         },
         workbox: {
           globPatterns: ['**/*.{js,css,html,ico,svg,webmanifest}'],
@@ -99,7 +100,7 @@ export default defineConfig(({ mode }) => {
                 cacheName: 'menu-image-cache',
                 expiration: { maxEntries: 140, maxAgeSeconds: 60 * 60 * 24 * 30 },
                 cacheableResponse: { statuses: [0, 200] },
-              }
+              },
             },
             {
               urlPattern: /^https:\/\/goldrushsportscoffee\.com\/wp-content\/uploads\//,
@@ -108,21 +109,21 @@ export default defineConfig(({ mode }) => {
                 cacheName: 'menu-image-cache',
                 expiration: { maxEntries: 60, maxAgeSeconds: 60 * 60 * 24 * 14 },
                 cacheableResponse: { statuses: [0, 200] },
-              }
+              },
             },
             {
               urlPattern: new RegExp(`^https://${escapedHost}/functions/v1/customer-menu`),
               handler: 'NetworkFirst',
-              options: { cacheName: 'menu-cache', expiration: { maxEntries: 8, maxAgeSeconds: 300 } }
+              options: { cacheName: 'menu-cache', expiration: { maxEntries: 8, maxAgeSeconds: 300 } },
             },
             {
               urlPattern: new RegExp(`^https://${escapedHost}/functions/v1/`),
-              handler: 'NetworkOnly'
-            }
-          ]
-        }
-      })
+              handler: 'NetworkOnly',
+            },
+          ],
+        },
+      }),
     ],
-    server: { port: 5173 }
+    server: { port: 5173 },
   }
 })

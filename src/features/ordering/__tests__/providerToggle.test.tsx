@@ -10,7 +10,6 @@ vi.mock('react-router-dom', () => ({
 
 // ── React Query ──────────────────────────────────────────────────────────────
 vi.mock('@tanstack/react-query', () => ({
-  useQuery: () => ({ data: [mockAddress], isLoading: false }),
   useQueryClient: () => ({ invalidateQueries: vi.fn() }),
 }))
 
@@ -21,7 +20,6 @@ vi.mock('../../../lib/api', () => ({
     createCashfreeOrder: vi.fn(),
     verifyRazorpayPayment: vi.fn(),
     placeOrder: vi.fn(),
-    listAddresses: vi.fn(),
   },
 }))
 
@@ -37,17 +35,28 @@ vi.mock('../useCashfree', () => ({
 
 // ── Customer profile / store status ─────────────────────────────────────────
 vi.mock('../../../hooks/useCustomerProfile', () => ({
-  useCustomerProfile: () => ({ data: { customer: { phone: '9999999999', name: 'Test User' } } }),
+  useCustomerProfile: () => ({
+    data: {
+      customer: {
+        id: 'cust-1',
+        phone: '9999999999',
+        name: 'Test User',
+        address_line1: '123 Main St',
+        address_line2: null,
+        city: 'Hyderabad',
+        state: 'Telangana',
+        zip_code: '500001',
+      },
+    },
+  }),
   useStoreStatus: () => ({ data: { store_status: '1' } }),
+  useAvailableRewards: () => ({ data: { rewards: [] }, isLoading: false }),
 }))
 
 // ── OrderingContext ──────────────────────────────────────────────────────────
 vi.mock('../OrderingContext', () => ({
   useOrdering: () => ({ storeInfo: { storeId: 'store-1', storeName: 'GoldRush', petpoojaRestaurantId: 'rest-001' } }),
 }))
-
-// ── AddressBottomSheet ───────────────────────────────────────────────────────
-vi.mock('../AddressBottomSheet', () => ({ AddressBottomSheet: () => null }))
 
 // ── lucide-react ─────────────────────────────────────────────────────────────
 vi.mock('lucide-react', () => ({
@@ -58,11 +67,6 @@ vi.mock('lucide-react', () => ({
 }))
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
-const mockAddress = {
-  address_id: 'addr-1', label: 'Home', line1: '123 Main St', line2: '',
-  city: 'Hyderabad', state: 'Telangana', pincode: '500001', is_default: true,
-}
-
 const cafeItem: CafeCartItem = {
   cartItemId: 'ci-1', productId: 'p-1', productCode: 'LAT-001',
   name: 'Latte', price: 200, quantity: 1, addons: [], specialInstructions: '',
@@ -108,13 +112,29 @@ describe('UnifiedCheckoutScreen — provider toggle visible (two providers)', ()
 
     // Re-mock all deps after resetModules
     vi.mock('react-router-dom', () => ({ useNavigate: () => vi.fn(), useLocation: () => ({ key: 'test-key' }) }))
-    vi.mock('@tanstack/react-query', () => ({ useQuery: () => ({ data: [mockAddress], isLoading: false }), useQueryClient: () => ({ invalidateQueries: vi.fn() }) }))
-    vi.mock('../../../lib/api', () => ({ api: { createOnlineOrder: vi.fn(), createCashfreeOrder: vi.fn(), verifyRazorpayPayment: vi.fn(), placeOrder: vi.fn(), listAddresses: vi.fn() } }))
+    vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: vi.fn() }) }))
+    vi.mock('../../../lib/api', () => ({ api: { createOnlineOrder: vi.fn(), createCashfreeOrder: vi.fn(), verifyRazorpayPayment: vi.fn(), placeOrder: vi.fn() } }))
     vi.mock('../useRazorpay', () => ({ useRazorpay: () => ({ open: vi.fn(), loading: false, error: null }) }))
     vi.mock('../useCashfree', () => ({ useCashfree: () => ({ open: vi.fn(), loading: false, error: null }) }))
-    vi.mock('../../../hooks/useCustomerProfile', () => ({ useCustomerProfile: () => ({ data: { customer: { phone: '9999999999', name: 'Test' } } }), useStoreStatus: () => ({ data: { store_status: '1' } }) }))
+    vi.mock('../../../hooks/useCustomerProfile', () => ({
+      useCustomerProfile: () => ({
+        data: {
+          customer: {
+            id: 'cust-1',
+            phone: '9999999999',
+            name: 'Test',
+            address_line1: '123 Main St',
+            address_line2: null,
+            city: 'Hyderabad',
+            state: 'Telangana',
+            zip_code: '500001',
+          },
+        },
+      }),
+      useStoreStatus: () => ({ data: { store_status: '1' } }),
+      useAvailableRewards: () => ({ data: { rewards: [] }, isLoading: false }),
+    }))
     vi.mock('../OrderingContext', () => ({ useOrdering: () => ({ storeInfo: { storeId: 's', storeName: 'G', petpoojaRestaurantId: 'r' } }) }))
-    vi.mock('../AddressBottomSheet', () => ({ AddressBottomSheet: () => null }))
     vi.mock('../../../contexts/CartContext', () => ({ useCart: () => ({ items: [cafeItem], cafeCount: 1, cafeSubtotal: 200, shopCart: [shopItem], shopCount: 1, shopSubtotalPaise: 140000, clearCafeCart: vi.fn(), clearShopCart: vi.fn() }) }))
     vi.mock('lucide-react', () => ({ ArrowLeft: () => <span>Back</span>, ChevronLeft: () => <span>C</span>, User: () => <span>U</span>, ShoppingBag: () => <span>S</span> }))
 

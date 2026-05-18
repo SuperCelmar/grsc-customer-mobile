@@ -82,7 +82,7 @@ export function VariantPickerSheet({ product, onClose, onViewCart }: Props) {
       <div className="relative bg-white rounded-t-2xl max-h-[92vh] flex flex-col overflow-hidden">
         {/* Hero */}
         <div
-          className="relative flex-shrink-0 flex items-center justify-center"
+          className="relative flex-shrink-0 flex items-center justify-center overflow-hidden"
           style={{ height: 240, backgroundColor: 'var(--muted)' }}
         >
           <ProductImage

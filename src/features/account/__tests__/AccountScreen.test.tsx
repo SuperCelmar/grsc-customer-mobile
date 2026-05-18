@@ -17,9 +17,7 @@ vi.mock('../../../lib/supabase', () => ({
 }))
 
 vi.mock('../../../lib/api', () => ({
-  api: {
-    listAddresses: vi.fn().mockResolvedValue([]),
-  },
+  api: {},
 }))
 
 vi.mock('lucide-react', () => ({
@@ -62,7 +60,18 @@ const baseAllowance = {
 
 const baseProfile: AccountProfile = {
   success: true,
-  customer: { id: 'c-1', name: 'Celmar', phone: '9876543210', email: null, created_at: '2026-01-01' },
+  customer: {
+    id: 'c-1',
+    name: 'Celmar',
+    phone: '9876543210',
+    email: null,
+    created_at: '2026-01-01',
+    address_line1: '123 Main St',
+    address_line2: null,
+    city: 'Hyderabad',
+    state: 'Telangana',
+    zip_code: '500001',
+  },
   membership: baseMembership,
   allowances: [baseAllowance],
   wallet: { cashback_balance: 500, potential_cashback_balance: 0, cashback_lifetime_earned: 1200 },
@@ -105,10 +114,6 @@ vi.mock('../SubscriptionAccordion', () => ({
 
 vi.mock('../CashbackStrip', () => ({
   CashbackStrip: () => <div data-testid="cashback-strip" />,
-}))
-
-vi.mock('../AddressesAccordion', () => ({
-  AddressesAccordion: () => <div data-testid="addresses-accordion" />,
 }))
 
 vi.mock('../PaymentsAccordion', () => ({
@@ -177,9 +182,24 @@ describe('AccountScreen', () => {
     render(<AccountScreen />)
     expect(screen.getByTestId('subscription-accordion')).toBeInTheDocument()
     expect(screen.getByTestId('cashback-strip')).toBeInTheDocument()
-    expect(screen.getByTestId('addresses-accordion')).toBeInTheDocument()
+    expect(screen.getByTestId('address-card')).toBeInTheDocument()
     expect(screen.getByTestId('payments-accordion')).toBeInTheDocument()
     expect(screen.getByTestId('referral-accordion')).toBeInTheDocument()
     expect(screen.getByTestId('settings-accordion')).toBeInTheDocument()
+  })
+
+  it('renders address from profile when present', () => {
+    render(<AccountScreen />)
+    expect(screen.getByText(/123 Main St/)).toBeInTheDocument()
+    expect(screen.getByText(/Hyderabad, Telangana - 500001/)).toBeInTheDocument()
+  })
+
+  it('renders empty-state copy when profile has no address', () => {
+    mockProfile = {
+      ...baseProfile,
+      customer: { ...baseProfile.customer!, address_line1: null, address_line2: null, city: null, state: null, zip_code: null },
+    }
+    render(<AccountScreen />)
+    expect(screen.getByText(/No address on file/i)).toBeInTheDocument()
   })
 })

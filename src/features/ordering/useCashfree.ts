@@ -73,8 +73,8 @@ export function useCashfree(): {
       } else {
         opts.onSuccess(opts.order_id)
       }
-    } catch (err: any) {
-      const msg = err.message || 'Failed to open payment'
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to open payment'
       setError(msg)
       opts.onFailure(msg)
     } finally {

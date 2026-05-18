@@ -98,8 +98,8 @@ export function PlansBrowseScreen() {
             })
             toast.success(`${plan.plan_name} activated`)
             navigate('/membership')
-          } catch (err: any) {
-            toast.error(err?.message ?? 'Membership activation failed')
+          } catch (err: unknown) {
+            toast.error(err instanceof Error ? err.message : 'Membership activation failed')
           } finally {
             setBusyPlanId(null)
           }
@@ -108,8 +108,8 @@ export function PlansBrowseScreen() {
           setBusyPlanId(null)
         },
       })
-    } catch (err: any) {
-      toast.error(err?.message ?? 'Could not start payment')
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Could not start payment')
       setBusyPlanId(null)
     }
   }
