@@ -1,5 +1,5 @@
 /// <reference types="vitest" />
-import { defineConfig } from 'vitest/config'
+import { configDefaults, defineConfig } from 'vitest/config'
 import { cpSync, createReadStream, existsSync, mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { loadEnv, type PluginOption } from 'vite'
@@ -67,6 +67,7 @@ export default defineConfig(({ mode }) => {
       globals: true,
       setupFiles: ['./src/test-setup.ts'],
       css: false,
+      exclude: [...configDefaults.exclude, 'tests/e2e/**'],
     },
     plugins: [
       react(),

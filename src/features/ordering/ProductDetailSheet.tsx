@@ -74,6 +74,7 @@ export function ProductDetailSheet({ product, onClose, onViewCart }: Props) {
       quantity,
       addons,
       specialInstructions,
+      imageUrl: product.image_url ?? null,
     })
     onClose()
     if (wasEmpty) onViewCart?.()

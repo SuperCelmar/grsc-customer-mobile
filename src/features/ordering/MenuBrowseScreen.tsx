@@ -305,6 +305,7 @@ function MenuBrowseInner() {
       quantity: 1,
       addons: [],
       specialInstructions: '',
+      imageUrl: product.image_url ?? null,
     })
     if (wasEmpty) setCartOpen(true)
   }

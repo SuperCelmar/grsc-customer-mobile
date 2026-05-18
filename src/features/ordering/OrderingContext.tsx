@@ -23,6 +23,7 @@ export function OrderingProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     supabase
+      .schema('location')
       .from('stores')
       .select('store_id, store_name, city, petpooja_restaurant_id')
       .eq('store_name', TARGET_STORE_NAME)

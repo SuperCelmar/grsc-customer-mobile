@@ -12,6 +12,7 @@ export type CafeCartItem = {
   quantity: number
   addons: AddonSelection[]
   specialInstructions: string
+  imageUrl?: string | null
 }
 
 function generateCartItemId(): string {

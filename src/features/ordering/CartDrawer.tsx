@@ -83,7 +83,7 @@ export function CartDrawer({ onClose, storeRestId, isStoreOpen }: Props) {
 
   // Pickup-only for v1 — selector UI hidden, state kept for payload shape
   const [orderType] = useState<'P' | 'H' | 'D'>('P')
-  const [paymentType, setPaymentType] = useState<'COD' | 'ONLINE' | 'CARD'>('COD')
+  const [paymentType, setPaymentType] = useState<'COD' | 'ONLINE'>('COD')
   const [selectedReward, setSelectedReward] = useState<LoyaltyReward | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -301,7 +301,17 @@ export function CartDrawer({ onClose, storeRestId, isStoreOpen }: Props) {
                 style={{ fontSize: 18, lineHeight: 1 }}
               >×</button>
               <div className="flex items-start gap-3">
-                <GRMonogram size={72} />
+                {item.imageUrl ? (
+                  <img
+                    src={item.imageUrl}
+                    alt={item.name}
+                    loading="lazy"
+                    className="flex-shrink-0 object-cover"
+                    style={{ width: 72, height: 72, borderRadius: 6 }}
+                  />
+                ) : (
+                  <GRMonogram size={72} />
+                )}
                 <div className="flex-1 min-w-0 pr-6">
                   <div className="mb-1"><TypePill kind="cafe" /></div>
                   <p className="text-sm font-medium text-[var(--text)]">{item.name}</p>
@@ -431,11 +441,13 @@ export function CartDrawer({ onClose, storeRestId, isStoreOpen }: Props) {
                   <div>
                     <label className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wide block mb-1.5">Payment</label>
                     <div className="flex gap-2">
-                      {(['COD', 'ONLINE', 'CARD'] as const).map(t => (
+                      {(['COD', 'ONLINE'] as const).map(t => (
                         <button
                           key={t}
                           onClick={() => setPaymentType(t)}
                           disabled={loading}
+                          aria-label={t === 'ONLINE' ? 'Online payment' : undefined}
+                          aria-pressed={paymentType === t}
                           className="flex-1 py-2 rounded-lg border text-sm font-medium disabled:opacity-40"
                           style={{
                             borderColor: paymentType === t ? 'var(--primary)' : 'var(--card)',
@@ -443,7 +455,7 @@ export function CartDrawer({ onClose, storeRestId, isStoreOpen }: Props) {
                             color: paymentType === t ? 'var(--primary)' : 'var(--text)',
                           }}
                         >
-                          {t === 'COD' ? 'Cash' : t === 'ONLINE' ? 'Online' : 'Card'}
+                          {t === 'COD' ? 'Pay at Store' : 'Pay Now'}
                         </button>
                       ))}
                     </div>

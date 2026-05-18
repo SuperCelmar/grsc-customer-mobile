@@ -121,7 +121,7 @@ describe('CartDrawer.handlePlaceOrder — Online payment branch', () => {
   beforeEach(() => {
     renderDrawer()
     // Switch to ONLINE payment
-    fireEvent.click(screen.getByRole('button', { name: /Online/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Online payment/i }))
   })
 
   it('calls openCashfree then navigate on success', async () => {
