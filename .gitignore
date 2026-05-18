@@ -32,3 +32,4 @@ playwright-report/
 
 # Large local-only menu image source files (use CDN/storage in prod)
 public/Menu Final Images/
+.vercel
